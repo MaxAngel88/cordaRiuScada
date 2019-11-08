@@ -36,7 +36,7 @@ object MeasureSchemaV1 : MappedSchema(
             @Column(name = "time")
             var time: Instant,
 
-            @Column(name = "xmlData")
+            @Column(name = "xmlData", length = 65535)
             var xmlData: String,
 
             @Column(name = "linear_id")

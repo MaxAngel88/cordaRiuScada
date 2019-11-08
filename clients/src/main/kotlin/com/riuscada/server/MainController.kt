@@ -72,6 +72,26 @@ class Controller(rpc: NodeRPCConnection) {
     }
 
     /**
+     * Displays last MeasureStates that exist in the node's vault for selected hostname.
+     */
+    @GetMapping(value = [ "getLastMeasureByHostname/{hostname}" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getLastMeasureByHostname(
+            @PathVariable("hostname")
+            hostname : String ) : ResponseEntity<List<StateAndRef<MeasureState>>> {
+
+        // setting the criteria for retrive CONSUMED and UNCONSUMED state from VAULT
+        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+
+        val foundHostnameMeasures = proxy.vaultQueryBy<MeasureState>(
+                criteria,
+                PageSpecification(1, MAX_PAGE_SIZE),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states.filter { it.state.data.hostname == hostname }
+
+        return ResponseEntity.ok(foundHostnameMeasures)
+    }
+
+    /**
      * Initiates a flow to agree an Measure between two nodes.
      *
      * Once the flow finishes it will have written the Message to ledger. Both NodeA, NodeB are able to
