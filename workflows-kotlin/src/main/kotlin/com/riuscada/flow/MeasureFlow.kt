@@ -140,7 +140,7 @@ object MeasureFlow {
                     val measure = output as MeasureState
                     /* "other rule measure" using (measure is new rule) */
                     "measure hostname cannot be empty" using (measure.hostname.isNotEmpty())
-                    "measure xmlData must be empty on creation" using (measure.xmlData.isEmpty())
+                    "measure xmlData must be empty on creation" using (measure.xmlData.isNullOrEmpty())
                 }
             }
             val txId = subFlow(signTransactionFlow).id

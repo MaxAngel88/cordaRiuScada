@@ -40,7 +40,7 @@ class MeasureContract : Contract {
             // Measure-specific constraints.
             "firstNode and secondNode cannot be the same entity." using (measure.firstNode != measure.secondNode)
             "time cannot be in the future." using (measure.time < Instant.now())
-            "xmlData must be empty." using (measure.xmlData.isEmpty())
+            "xmlData must be empty." using (measure.xmlData.isNullOrEmpty())
             "hostname cannot be empty" using (measure.hostname.isNotEmpty())
         }
     }
