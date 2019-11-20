@@ -1,8 +1,8 @@
 package com.riuscada.flow
 
 import co.paralleluniverse.fibers.Suspendable
-import com.riuscada.contract.MeasureContract
-import com.riuscada.state.MeasureState
+import com.riuscada.contract.CommandContract
+import com.riuscada.state.CommandState
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.contracts.requireThat
@@ -19,28 +19,29 @@ import net.corda.core.utilities.ProgressTracker.Step
 import java.time.Instant
 import java.util.*
 
-object MeasureFlow {
+object CommandFlow {
 
     /**
      *
-     * Issue Measure Flow ------------------------------------------------------------------------------------
+     * Issue Command Flow ------------------------------------------------------------------------------------
      *
      * */
     @InitiatingFlow
     @StartableByRPC
-    class Issuer(val hostname: String,
+    class IssuerCommand(val hostname: String,
                  val macAddress: String,
                  val time: Instant,
-                 val xmlData: String) : FlowLogic<MeasureState>() {
+                 val xmlCommandData: String,
+                 val status: String) : FlowLogic<CommandState>() {
         /**
          * The progress tracker checkpoints each stage of the flow and outputs the specified messages when each
          * checkpoint is reached in the code. See the 'progressTracker.currentStep' expressions within the call() function.
          */
         companion object {
-            object GENERATING_TRANSACTION : Step("Generating transaction based on new Measure.")
+            object GENERATING_TRANSACTION : Step("Generating transaction based on new Command.")
             object VERIFYING_TRANSACTION : Step("Verifying contract constraints.")
             object SIGNING_TRANSACTION : Step("Signing transaction with our private key.")
-            object GATHERING_SIGS : Step("Gathering the otherNode signature.") {
+            object GATHERING_SIGS : Step("Gathering the secondNode signature.") {
                 override fun childProgressTracker() = CollectSignaturesFlow.tracker()
             }
 
@@ -63,12 +64,27 @@ object MeasureFlow {
          * The flow logic is encapsulated within the call() method.
          */
         @Suspendable
-        override fun call(): MeasureState {
+        override fun call(): CommandState {
             // Obtain a reference to the notary we want to use.
             val notary = serviceHub.networkMapCache.notaryIdentities[0]
 
             // Stage 1.
             progressTracker.currentStep = GENERATING_TRANSACTION
+
+            // Control if CommandState already exist for that hostname.
+            var criteria: QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+            val lastMacAddressCommandStates = serviceHub.vaultService.queryBy<CommandState>(
+                    criteria,
+                    PageSpecification(1, MAX_PAGE_SIZE),
+                    Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+            ).states.filter { it.state.data.macAddress == macAddress }
+
+            if (lastMacAddressCommandStates.isNotEmpty()) {
+                val lastCommandStateStateRef = lastMacAddressCommandStates[0]
+                val commandStateData = lastCommandStateStateRef.state.data
+                val commandStateLinearID = commandStateData.linearId
+                throw FlowException("CommandState for the macAddress: $macAddress already exist in the ledger. You must update the state with LinearId: $commandStateLinearID instead of create a new one.")
+            }
 
             val myLegalIdentity: Party = serviceHub.myInfo.legalIdentities.first()
             var firstPartyOrg : String = myLegalIdentity.name.organisation
@@ -93,20 +109,20 @@ object MeasureFlow {
             }
 
             // Generate an unsigned transaction.
-            val measureState = MeasureState(
+            val commandState = CommandState(
                     myLegalIdentity,
                     secondParty,
                     hostname,
                     macAddress,
                     time,
-                    xmlData,
+                    xmlCommandData,
+                    status,
                     UniqueIdentifier(id = UUID.randomUUID()))
 
 
-
-            val txCommand = Command(MeasureContract.Commands.Issue(), measureState.participants.map { it.owningKey })
+            val txCommand = Command(CommandContract.Commands.Issue(), commandState.participants.map { it.owningKey })
             val txBuilder = TransactionBuilder(notary)
-                    .addOutputState(measureState, MeasureContract.ID)
+                    .addOutputState(commandState, CommandContract.ID)
                     .addCommand(txCommand)
 
             // Stage 2.
@@ -131,23 +147,24 @@ object MeasureFlow {
             subFlow(FinalityFlow(fullySignedTx, setOf(secondPartySession), FINALISING_TRANSACTION.childProgressTracker()))
 
 
-            return measureState
+            return commandState
         }
     }
 
-    @InitiatedBy(Issuer::class)
+    @InitiatedBy(IssuerCommand::class)
     class Receiver(val otherPartySession: FlowSession) : FlowLogic<SignedTransaction>() {
         @Suspendable
         override fun call(): SignedTransaction {
             val signTransactionFlow = object : SignTransactionFlow(otherPartySession) {
                 override fun checkTransaction(stx: SignedTransaction) = requireThat {
                     val output = stx.tx.outputs.single().data
-                    "This must be an measure transaction." using (output is MeasureState)
-                    val measure = output as MeasureState
-                    /* "other rule measure" using (measure is new rule) */
-                    "measure hostname cannot be empty" using (measure.hostname.isNotEmpty())
-                    "measure macAddress cannot be empty" using (measure.macAddress.isNotEmpty())
-                    "measure xmlData must be empty on creation" using (measure.xmlData.isNullOrEmpty())
+                    "This must be an command transaction." using (output is CommandState)
+                    val commandState = output as CommandState
+                    /* "other rule command" using (command is new rule) */
+                    "command hostname cannot be empty" using (commandState.hostname.isNotEmpty())
+                    "command macAddress cannot be empty" using (commandState.macAddress.isNotEmpty())
+                    "command status cannot be empty" using (commandState.status.isNotEmpty())
+                    "command xmlCommandData cannot be empty on creation" using (commandState.xmlCommandData.isNotEmpty())
                 }
             }
             val txId = subFlow(signTransactionFlow).id
@@ -158,25 +175,26 @@ object MeasureFlow {
 
     /***
      *
-     * Update Measure Flow -----------------------------------------------------------------------------------
+     * Update Command Flow -----------------------------------------------------------------------------------
      *
      * */
     @InitiatingFlow
     @StartableByRPC
-    class Updater(val measureLinearId: String,
-                  val hostname: String,
-                  val macAddress: String,
-                  val time: Instant,
-                  val xmlData: String) : FlowLogic<MeasureState>() {
+    class UpdaterCommand(val commandLinearId: String,
+                         val hostname: String,
+                         val macAddress: String,
+                         val time: Instant,
+                         val xmlCommandData: String,
+                         val status: String) : FlowLogic<CommandState>() {
         /**
          * The progress tracker checkpoints each stage of the flow and outputs the specified messages when each
          * checkpoint is reached in the code. See the 'progressTracker.currentStep' expressions within the call() function.
          */
         companion object {
-            object GENERATING_TRANSACTION : ProgressTracker.Step("Generating transaction based on transfert Message.")
+            object GENERATING_TRANSACTION : ProgressTracker.Step("Generating transaction based on transfert Command.")
             object VERIFYIGN_TRANSACTION : ProgressTracker.Step("Verifying contract constraints.")
             object SIGNING_TRANSACTION : ProgressTracker.Step("Signing transaction with our private key.")
-            object GATHERING_SIGS : ProgressTracker.Step("Gathering the destinatario's signature.") {
+            object GATHERING_SIGS : ProgressTracker.Step("Gathering the secondNode signature.") {
                 override fun childProgressTracker() = CollectSignaturesFlow.tracker()
             }
 
@@ -199,7 +217,7 @@ object MeasureFlow {
          * The flow logic is encapsulated within the call() method.
          */
         @Suspendable
-        override fun call(): MeasureState {
+        override fun call(): CommandState {
             // Obtain a reference to the notary we want to use.
             val notary = serviceHub.networkMapCache.notaryIdentities[0]
             val myLegalIdentity : Party = serviceHub.myInfo.legalIdentities.first()
@@ -232,34 +250,35 @@ object MeasureFlow {
             progressTracker.currentStep = GENERATING_TRANSACTION
             // Generate an unsigned transaction.
             var criteria: QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
-            var customCriteria = QueryCriteria.LinearStateQueryCriteria(uuid = listOf(UUID.fromString(measureLinearId)))
+            var customCriteria = QueryCriteria.LinearStateQueryCriteria(uuid = listOf(UUID.fromString(commandLinearId)))
             criteria = criteria.and(customCriteria)
 
-            val oldMeasureStateList = serviceHub.vaultService.queryBy<MeasureState>(
+            val oldCommandStateList = serviceHub.vaultService.queryBy<CommandState>(
                     criteria,
                     PageSpecification(1, MAX_PAGE_SIZE),
                     Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
             ).states
 
-            if (oldMeasureStateList.size > 1 || oldMeasureStateList.isEmpty()) throw FlowException("No measure state with UUID: " + UUID.fromString(measureLinearId) + " found.")
+            if (oldCommandStateList.size > 1 || oldCommandStateList.isEmpty()) throw FlowException("No CommandState with UUID: " + UUID.fromString(commandLinearId) + " found.")
 
-            val oldMeasureStateRef = oldMeasureStateList[0]
-            val oldMeasureState = oldMeasureStateRef.state.data
+            val oldCommandStateRef = oldCommandStateList[0]
+            val oldCommandState = oldCommandStateRef.state.data
 
-            val newMeasureState = MeasureState(
+            val newCommandState = CommandState(
                     myLegalIdentity,
                     secondParty,
                     hostname,
                     macAddress,
                     time,
-                    xmlData,
+                    xmlCommandData,
+                    status,
                     UniqueIdentifier(id = UUID.randomUUID())
             )
 
-            val txCommand = Command(MeasureContract.Commands.Update(), newMeasureState.participants.map { it.owningKey })
+            val txCommand = Command(CommandContract.Commands.Update(), newCommandState.participants.map { it.owningKey })
             val txBuilder = TransactionBuilder(notary)
-                    .addInputState(oldMeasureStateRef)
-                    .addOutputState(newMeasureState, MeasureContract.ID)
+                    .addInputState(oldCommandStateRef)
+                    .addOutputState(newCommandState, CommandContract.ID)
                     .addCommand(txCommand)
 
             // Stage 2.
@@ -280,12 +299,12 @@ object MeasureFlow {
             // Send the state to the counterparty, and receive it back with their signature.
             when(myLegalIdentity){
 
-                oldMeasureState.firstNode -> {
-                    otherFlow = initiateFlow(oldMeasureState.secondNode)
+                oldCommandState.firstNode -> {
+                    otherFlow = initiateFlow(oldCommandState.secondNode)
                 }
 
-                oldMeasureState.secondNode -> {
-                    otherFlow = initiateFlow(oldMeasureState.firstNode)
+                oldCommandState.secondNode -> {
+                    otherFlow = initiateFlow(oldCommandState.firstNode)
                 }
 
                 else -> throw FlowException("node "+serviceHub.myInfo.legalIdentities.first()+" cannot start the flow")
@@ -298,22 +317,23 @@ object MeasureFlow {
             progressTracker.currentStep = FINALISING_TRANSACTION
             // Notarise and record the transaction in both parties' vaults.
             subFlow(FinalityFlow(fullySignedTx, setOf(otherFlow), FINALISING_TRANSACTION.childProgressTracker()))
-            return newMeasureState
+            return newCommandState
         }
 
-        @InitiatedBy(Updater::class)
+        @InitiatedBy(UpdaterCommand::class)
         class UpdateAcceptor(val otherPartySession: FlowSession) : FlowLogic<SignedTransaction>() {
             @Suspendable
             override fun call(): SignedTransaction {
                 val signTransactionFlow = object : SignTransactionFlow(otherPartySession) {
                     override fun checkTransaction(stx: SignedTransaction) = requireThat {
                         val output = stx.tx.outputs.single().data
-                        "This must be an measure transaction." using (output is MeasureState)
-                        val measure = output as MeasureState
-                        /* "other rule measure" using (output is new rule) */
-                        "measure hostname cannot be empty" using (measure.hostname.isNotEmpty())
-                        "measure macAddress cannot be empty" using (measure.macAddress.isNotEmpty())
-                        "measure xmlData cannot be empty on creation" using (measure.xmlData.isNotEmpty())
+                        "This must be an command transaction." using (output is CommandState)
+                        val commandState = output as CommandState
+                        /* "other rule command" using (output is new rule) */
+                        "command hostname cannot be empty" using (commandState.hostname.isNotEmpty())
+                        "command macAddress cannot be empty" using (commandState.macAddress.isNotEmpty())
+                        "command status cannot be empty" using (commandState.status.isNotEmpty())
+                        "command xmlCommandData cannot be empty on update" using (commandState.xmlCommandData.isNotEmpty())
                     }
                 }
                 val txId = subFlow(signTransactionFlow).id

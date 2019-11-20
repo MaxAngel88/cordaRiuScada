@@ -9,21 +9,21 @@ import javax.persistence.Entity
 import javax.persistence.Table
 
 /**
- * The family of schemas for MeasureState.
+ * The family of schemas for CommandState.
  */
-object MeasureSchema
+object CommandSchema
 
 /**
- * An MessageState schema.
+ * A CommandState schema.
  */
-object MeasureSchemaV1 : MappedSchema(
-        schemaFamily = MeasureSchema.javaClass,
+object CommandSchemaV1 : MappedSchema(
+        schemaFamily = CommandSchema.javaClass,
         version = 1,
-        mappedTypes = listOf(PersistentMeasure::class.java)) {
+        mappedTypes = listOf(PersistentCommand::class.java)) {
 
     @Entity
-    @Table(name = "measure_states")
-    class PersistentMeasure(
+    @Table(name = "command_states")
+    class PersistentCommand(
             @Column(name = "firstNode")
             var firstNode: String,
 
@@ -33,19 +33,22 @@ object MeasureSchemaV1 : MappedSchema(
             @Column(name = "hostname")
             var hostname: String,
 
-            @Column(name = "macAddress")
+            @Column(name = "mac_address")
             var macAddress: String,
 
             @Column(name = "time")
             var time: Instant,
 
-            @Column(name = "xmlData", length = 65535)
-            var xmlData: String,
+            @Column(name = "xmlCommandData", length = 65535)
+            var xmlCommandData: String,
+
+            @Column(name = "status")
+            var status: String,
 
             @Column(name = "linear_id")
             var linearId: UUID
     ) : PersistentState() {
         // Default constructor required by hibernate.
-        constructor(): this(firstNode = "", secondNode = "", hostname = "", macAddress = "", time = Instant.now(), xmlData = "", linearId = UUID.randomUUID())
+        constructor(): this(firstNode = "", secondNode = "", hostname = "", macAddress =  "", time = Instant.now(), xmlCommandData = "", status = "", linearId = UUID.randomUUID())
     }
 }

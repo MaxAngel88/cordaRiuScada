@@ -2,9 +2,10 @@ package com.riuscada.server
 
 import com.riuscada.flow.MeasureFlow.Issuer
 import com.riuscada.flow.MeasureFlow.Updater
-import com.riuscada.server.pojo.IssueMeasurePojo
-import com.riuscada.server.pojo.ResponsePojo
-import com.riuscada.server.pojo.UpdateMeasurePojo
+import com.riuscada.flow.CommandFlow.IssuerCommand
+import com.riuscada.flow.CommandFlow.UpdaterCommand
+import com.riuscada.server.pojo.*
+import com.riuscada.state.CommandState
 import com.riuscada.state.MeasureState
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.identity.CordaX500Name
@@ -67,7 +68,7 @@ class Controller(rpc: NodeRPCConnection) {
      * Displays all MeasureStates that exist in the node's vault.
      */
     @GetMapping(value = [ "getLastMeasures" ], produces = [ APPLICATION_JSON_VALUE ])
-    fun getLastMeasure() : ResponseEntity<List<StateAndRef<MeasureState>>> {
+    fun getLastMeasures() : ResponseEntity<List<StateAndRef<MeasureState>>> {
         return ResponseEntity.ok(proxy.vaultQueryBy<MeasureState>().states)
     }
 
@@ -79,7 +80,7 @@ class Controller(rpc: NodeRPCConnection) {
             @PathVariable("hostname")
             hostname : String ) : ResponseEntity<List<StateAndRef<MeasureState>>> {
 
-        // setting the criteria for retrive CONSUMED and UNCONSUMED state from VAULT
+        // setting the criteria for retrive UNCONSUMED state from VAULT
         var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
 
         val foundHostnameMeasures = proxy.vaultQueryBy<MeasureState>(
@@ -92,9 +93,29 @@ class Controller(rpc: NodeRPCConnection) {
     }
 
     /**
+     * Displays last MeasureStates that exist in the node's vault for selected macAddress.
+     */
+    @GetMapping(value = [ "getLastMeasureByMacAddress/{macAddress}" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getLastMeasureByMacAddress(
+            @PathVariable("macAddress")
+            macAddress : String ) : ResponseEntity<List<StateAndRef<MeasureState>>> {
+
+        // setting the criteria for retrive UNCONSUMED state from VAULT
+        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+
+        val foundMacAddressMeasures = proxy.vaultQueryBy<MeasureState>(
+                criteria,
+                PageSpecification(1, MAX_PAGE_SIZE),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states.filter { it.state.data.macAddress == macAddress }
+
+        return ResponseEntity.ok(foundMacAddressMeasures)
+    }
+
+    /**
      * Initiates a flow to agree an Measure between two nodes.
      *
-     * Once the flow finishes it will have written the Message to ledger. Both NodeA, NodeB are able to
+     * Once the flow finishes it will have written the Measure to ledger. Both NodeA, NodeB are able to
      * see it when calling /spring/riuscada.com/api/ on their respective nodes.
      *
      * This end-point takes a Party name parameter as part of the path. If the serving node can't find the other party
@@ -107,11 +128,16 @@ class Controller(rpc: NodeRPCConnection) {
             @RequestBody
             issueMeasurePojo : IssueMeasurePojo): ResponseEntity<ResponsePojo> {
         val hostname = issueMeasurePojo.hostname
+        val macAddress = issueMeasurePojo.macAddress
         val time = issueMeasurePojo.time
         val xmlData = issueMeasurePojo.xmlData
 
         if(hostname.isEmpty()) {
             return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "hostname cannot be empty", data = null))
+        }
+
+        if(macAddress.isEmpty()){
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "macAddress cannot be empty", data = null))
         }
 
         if(time.isEmpty()) {
@@ -122,7 +148,7 @@ class Controller(rpc: NodeRPCConnection) {
             return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "xmlData must be empty on issue measure", data = null))
         }
         return try {
-            val measure = proxy.startTrackedFlow(::Issuer, hostname, Instant.parse(time), xmlData).returnValue.getOrThrow()
+            val measure = proxy.startTrackedFlow(::Issuer, hostname, macAddress, Instant.parse(time), xmlData).returnValue.getOrThrow()
             ResponseEntity.status(HttpStatus.CREATED).body(ResponsePojo(outcome = "SUCCESS", message = "Transaction id ${measure.linearId.id} committed to ledger.\n", data = measure))
         } catch (ex: Throwable) {
             logger.error(ex.message, ex)
@@ -130,8 +156,11 @@ class Controller(rpc: NodeRPCConnection) {
         }
     }
 
-    @GetMapping(value = [ "getHistoryByHostname/{hostname}" ], produces = [ APPLICATION_JSON_VALUE ])
-    fun getHistoryByHostname(
+    /**
+     * Displays History MeasureStates that exist in the node's vault for selected hostname.
+     */
+    @GetMapping(value = [ "getHistoryMeasureStateByHostname/{hostname}" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getHistoryMeasureStateByHostname(
             @PathVariable("hostname")
             hostname : String ) : ResponseEntity<List<StateAndRef<MeasureState>>> {
 
@@ -144,6 +173,28 @@ class Controller(rpc: NodeRPCConnection) {
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
         ).states.filter { it.state.data.hostname == hostname }
 
+
+        return ResponseEntity.ok(foundHostnameMeasures)
+    }
+
+    /**
+     * Displays History MeasureStates that exist in the node's vault for selected macAddress.
+     */
+    @GetMapping(value = [ "getHistoryMeasureStateByMacAddress/{macAddress}" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getHistoryMeasureStateByMacAddress(
+            @PathVariable("macAddress")
+            macAddress : String ) : ResponseEntity<List<StateAndRef<MeasureState>>> {
+
+        // setting the criteria for retrive CONSUMED and UNCONSUMED state from VAULT
+        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.ALL)
+
+        val foundHostnameMeasures = proxy.vaultQueryBy<MeasureState>(
+                criteria,
+                PageSpecification(1, MAX_PAGE_SIZE),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states.filter { it.state.data.macAddress == macAddress }
+
+
         return ResponseEntity.ok(foundHostnameMeasures)
     }
 
@@ -155,12 +206,13 @@ class Controller(rpc: NodeRPCConnection) {
     @PostMapping(value = [ "update-measure" ], consumes = [APPLICATION_JSON_VALUE], produces = [ APPLICATION_JSON_VALUE], headers = [ "Content-Type=application/json" ])
     fun updateMeasure(
             @RequestBody
-            updateMeasureJson: UpdateMeasurePojo): ResponseEntity<ResponsePojo> {
+            updateMeasurePojo: UpdateMeasurePojo): ResponseEntity<ResponsePojo> {
 
-        val measureLinearId = updateMeasureJson.measureLinearId
-        var hostname = updateMeasureJson.hostname
-        val time = updateMeasureJson.time
-        val xmlData = updateMeasureJson.xmlData
+        val measureLinearId = updateMeasurePojo.measureLinearId
+        val hostname = updateMeasurePojo.hostname
+        val macAddress = updateMeasurePojo.macAddress
+        val time = updateMeasurePojo.time
+        val xmlData = updateMeasurePojo.xmlData
 
         if(measureLinearId.isEmpty()) {
             return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "measureLinearId cannot be empty", data = null))
@@ -168,6 +220,10 @@ class Controller(rpc: NodeRPCConnection) {
 
         if(hostname.isEmpty()) {
             return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "hostname cannot be empty", data = null))
+        }
+
+        if(macAddress.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "macAddress cannot be empty", data = null))
         }
 
         if(time.isEmpty()) {
@@ -179,8 +235,204 @@ class Controller(rpc: NodeRPCConnection) {
         }
 
         return try {
-            val updateMeasure = proxy.startTrackedFlow(::Updater, measureLinearId, hostname, Instant.parse(time), xmlData).returnValue.getOrThrow()
+            val updateMeasure = proxy.startTrackedFlow(::Updater, measureLinearId, hostname, macAddress, Instant.parse(time), xmlData).returnValue.getOrThrow()
             ResponseEntity.status(HttpStatus.CREATED).body(ResponsePojo(outcome = "SUCCESS", message = "Measure with id: $measureLinearId update correctly. " + "New MeasureState with id: ${updateMeasure.linearId.id}  created.. ledger updated.\n", data = updateMeasure))
+        } catch (ex: Throwable) {
+            logger.error(ex.message, ex)
+            ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = ex.message!!, data = null))
+        }
+    }
+
+    /**
+     *
+     * COMMAND API -----------------------------------------------------------------------------------------------
+     *
+     */
+
+    /**
+     * Displays all CommandStates that exist in the node's vault.
+     */
+    @GetMapping(value = [ "getLastCommands" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getLastCommand() : ResponseEntity<List<StateAndRef<CommandState>>> {
+        return ResponseEntity.ok(proxy.vaultQueryBy<CommandState>().states)
+    }
+
+    /**
+     * Displays last CommandStates that exist in the node's vault for selected hostname.
+     */
+    @GetMapping(value = [ "getLastCommandByHostname/{hostname}" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getLastCommandByHostname(
+            @PathVariable("hostname")
+            hostname : String ) : ResponseEntity<List<StateAndRef<CommandState>>> {
+
+        // setting the criteria for retrive UNCONSUMED state from VAULT
+        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+
+        val foundHostnameCommands = proxy.vaultQueryBy<CommandState>(
+                criteria,
+                PageSpecification(1, MAX_PAGE_SIZE),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states.filter { it.state.data.hostname == hostname }
+
+        return ResponseEntity.ok(foundHostnameCommands)
+    }
+
+    /**
+     * Displays last CommandStates that exist in the node's vault for selected macAddress.
+     */
+    @GetMapping(value = [ "getLastCommandByMacAddress/{macAddress}" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getLastCommandByMacAddress(
+            @PathVariable("macAddress")
+            macAddress : String ) : ResponseEntity<List<StateAndRef<CommandState>>> {
+
+        // setting the criteria for retrive UNCONSUMED state from VAULT
+        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+
+        val foundMacAddressCommands = proxy.vaultQueryBy<CommandState>(
+                criteria,
+                PageSpecification(1, MAX_PAGE_SIZE),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states.filter { it.state.data.macAddress == macAddress }
+
+        return ResponseEntity.ok(foundMacAddressCommands)
+    }
+
+    /**
+     * Initiates a flow to agree an Command between two nodes.
+     *
+     * Once the flow finishes it will have written the Command to ledger. Both NodeA, NodeB are able to
+     * see it when calling /spring/riuscada.com/api/ on their respective nodes.
+     *
+     * This end-point takes a Party name parameter as part of the path. If the serving node can't find the other party
+     * in its network map cache, it will return an HTTP bad request.
+     *
+     * The flow is invoked asynchronously. It returns a future when the flow's call() method returns.
+     */
+    @PostMapping(value = [ "issue-command" ], produces = [ APPLICATION_JSON_VALUE ], headers = [ "Content-Type=application/json" ])
+    fun issueCommand(
+            @RequestBody
+            issueCommandPojo : IssueCommandPojo): ResponseEntity<ResponsePojo> {
+        val hostname = issueCommandPojo.hostname
+        val macAddress = issueCommandPojo.macAddress
+        val time = issueCommandPojo.time
+        val xmlCommandData = issueCommandPojo.xmlCommandData
+        val status = issueCommandPojo.status
+
+        if(hostname.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "hostname cannot be empty", data = null))
+        }
+
+        if(macAddress.isEmpty()){
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "macAddress cannot be empty", data = null))
+        }
+
+        if(time.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "time cannot be empty", data = null))
+        }
+
+        if(xmlCommandData.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "xmlCommandData cannot be empty on issue command", data = null))
+        }
+
+        if(status.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "status cannot be empty", data = null))
+        }
+
+        return try {
+            val command = proxy.startTrackedFlow(::IssuerCommand, hostname, macAddress, Instant.parse(time), xmlCommandData, status).returnValue.getOrThrow()
+            ResponseEntity.status(HttpStatus.CREATED).body(ResponsePojo(outcome = "SUCCESS", message = "Transaction id ${command.linearId.id} committed to ledger.\n", data = command))
+        } catch (ex: Throwable) {
+            logger.error(ex.message, ex)
+            ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = ex.message!!, data = null))
+        }
+    }
+
+    /**
+     * Displays History CommandStates that exist in the node's vault for selected hostname.
+     */
+    @GetMapping(value = [ "getHistoryCommandStateByHostname/{hostname}" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getHistoryCommandStateByHostname(
+            @PathVariable("hostname")
+            hostname : String ) : ResponseEntity<List<StateAndRef<CommandState>>> {
+
+        // setting the criteria for retrive CONSUMED and UNCONSUMED state from VAULT
+        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.ALL)
+
+        val foundHostnameCommands = proxy.vaultQueryBy<CommandState>(
+                criteria,
+                PageSpecification(1, MAX_PAGE_SIZE),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states.filter { it.state.data.hostname == hostname }
+
+
+        return ResponseEntity.ok(foundHostnameCommands)
+    }
+
+    /**
+     * Displays History CommandStates that exist in the node's vault for selected macAddress.
+     */
+    @GetMapping(value = [ "getHistoryCommandStateByMacAddress/{macAddress}" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getHistoryCommandStateByMacAddress(
+            @PathVariable("macAddress")
+            macAddress : String ) : ResponseEntity<List<StateAndRef<CommandState>>> {
+
+        // setting the criteria for retrive CONSUMED and UNCONSUMED state from VAULT
+        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.ALL)
+
+        val foundHostnameCommands = proxy.vaultQueryBy<CommandState>(
+                criteria,
+                PageSpecification(1, MAX_PAGE_SIZE),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states.filter { it.state.data.macAddress == macAddress }
+
+
+        return ResponseEntity.ok(foundHostnameCommands)
+    }
+
+    /***
+     *
+     * Update Command
+     *
+     */
+    @PostMapping(value = [ "update-command" ], consumes = [APPLICATION_JSON_VALUE], produces = [ APPLICATION_JSON_VALUE], headers = [ "Content-Type=application/json" ])
+    fun updateCommand(
+            @RequestBody
+            updateCommandPojo: UpdateCommandPojo): ResponseEntity<ResponsePojo> {
+
+        val commandLinearId = updateCommandPojo.commandLinearId
+        val hostname = updateCommandPojo.hostname
+        val macAddress = updateCommandPojo.macAddress
+        val time = updateCommandPojo.time
+        val xmlCommandData = updateCommandPojo.xmlCommandData
+        val status = updateCommandPojo.status
+
+        if(commandLinearId.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "commandLinearId cannot be empty", data = null))
+        }
+
+        if(hostname.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "hostname cannot be empty", data = null))
+        }
+
+        if(macAddress.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "macAddress cannot be empty", data = null))
+        }
+
+        if(time.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "time cannot be empty", data = null))
+        }
+
+        if(xmlCommandData.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "xmlCommandData cannot be empty", data = null))
+        }
+
+        if(status.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "status cannot be empty", data = null))
+        }
+
+        return try {
+            val updateCommand = proxy.startTrackedFlow(::UpdaterCommand, commandLinearId, hostname, macAddress, Instant.parse(time), xmlCommandData, status).returnValue.getOrThrow()
+            ResponseEntity.status(HttpStatus.CREATED).body(ResponsePojo(outcome = "SUCCESS", message = "Command with id: $commandLinearId update correctly. " + "New CommandState with id: ${updateCommand.linearId.id}  created.. ledger updated.\n", data = updateCommand))
         } catch (ex: Throwable) {
             logger.error(ex.message, ex)
             ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = ex.message!!, data = null))
