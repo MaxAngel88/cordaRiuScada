@@ -68,7 +68,7 @@ class MeasureContract : Contract {
 
 
     /**
-     * This contract only implements one command, Create.
+     * This contract only implements two commands: Issue and Update.
      */
     interface Commands : CommandData {
         class Issue : Commands, TypeOnlyCommandData()

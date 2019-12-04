@@ -4,8 +4,11 @@ import com.riuscada.flow.MeasureFlow.Issuer
 import com.riuscada.flow.MeasureFlow.Updater
 import com.riuscada.flow.CommandFlow.IssuerCommand
 import com.riuscada.flow.CommandFlow.UpdaterCommand
+import com.riuscada.flow.ForcedMeasureFlow.ForcedIssuer
+import com.riuscada.flow.ForcedMeasureFlow.ForcedUpdater
 import com.riuscada.server.pojo.*
 import com.riuscada.state.CommandState
+import com.riuscada.state.ForcedMeasureState
 import com.riuscada.state.MeasureState
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.identity.CordaX500Name
@@ -433,6 +436,203 @@ class Controller(rpc: NodeRPCConnection) {
         return try {
             val updateCommand = proxy.startTrackedFlow(::UpdaterCommand, commandLinearId, hostname, macAddress, Instant.parse(time), xmlCommandData, status).returnValue.getOrThrow()
             ResponseEntity.status(HttpStatus.CREATED).body(ResponsePojo(outcome = "SUCCESS", message = "Command with id: $commandLinearId update correctly. " + "New CommandState with id: ${updateCommand.linearId.id}  created.. ledger updated.\n", data = updateCommand))
+        } catch (ex: Throwable) {
+            logger.error(ex.message, ex)
+            ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = ex.message!!, data = null))
+        }
+    }
+
+    /**
+     *
+     * FORCED MEASURE API -----------------------------------------------------------------------------------------------
+     *
+     */
+
+    /**
+     * Displays all ForcedMeasureStates that exist in the node's vault.
+     */
+    @GetMapping(value = [ "getLastForcedMeasures" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getLastForcedMeasures() : ResponseEntity<List<StateAndRef<ForcedMeasureState>>> {
+        return ResponseEntity.ok(proxy.vaultQueryBy<ForcedMeasureState>().states)
+    }
+
+    /**
+     * Displays last ForcedMeasureStates that exist in the node's vault for selected hostname.
+     */
+    @GetMapping(value = [ "getLastForcedMeasureByHostname/{hostname}" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getLastForcedMeasureByHostname(
+            @PathVariable("hostname")
+            hostname : String ) : ResponseEntity<List<StateAndRef<ForcedMeasureState>>> {
+
+        // setting the criteria for retrive UNCONSUMED state from VAULT
+        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+
+        val foundHostnameForcedMeasures = proxy.vaultQueryBy<ForcedMeasureState>(
+                criteria,
+                PageSpecification(1, MAX_PAGE_SIZE),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states.filter { it.state.data.hostname == hostname }
+
+        return ResponseEntity.ok(foundHostnameForcedMeasures)
+    }
+
+    /**
+     * Displays last ForcedMeasureStates that exist in the node's vault for selected macAddress.
+     */
+    @GetMapping(value = [ "getLastForcedMeasureByMacAddress/{macAddress}" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getLastForcedMeasureByMacAddress(
+            @PathVariable("macAddress")
+            macAddress : String ) : ResponseEntity<List<StateAndRef<ForcedMeasureState>>> {
+
+        // setting the criteria for retrive UNCONSUMED state from VAULT
+        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+
+        val foundMacAddressForcedMeasures = proxy.vaultQueryBy<ForcedMeasureState>(
+                criteria,
+                PageSpecification(1, MAX_PAGE_SIZE),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states.filter { it.state.data.macAddress == macAddress }
+
+        return ResponseEntity.ok(foundMacAddressForcedMeasures)
+    }
+
+    /**
+     * Initiates a flow to agree an ForcedMeasure between two nodes.
+     *
+     * Once the flow finishes it will have written the Measure to ledger. Both NodeA, NodeB are able to
+     * see it when calling /spring/riuscada.com/api/ on their respective nodes.
+     *
+     * This end-point takes a Party name parameter as part of the path. If the serving node can't find the other party
+     * in its network map cache, it will return an HTTP bad request.
+     *
+     * The flow is invoked asynchronously. It returns a future when the flow's call() method returns.
+     */
+    @PostMapping(value = [ "issue-forced-measure" ], produces = [ APPLICATION_JSON_VALUE ], headers = [ "Content-Type=application/json" ])
+    fun issueForcedMeasure(
+            @RequestBody
+            issueForcedMeasurePojo : IssueFocedMeasurePojo): ResponseEntity<ResponsePojo> {
+        val hostname = issueForcedMeasurePojo.hostname
+        val macAddress = issueForcedMeasurePojo.macAddress
+        val xmlData = issueForcedMeasurePojo.xmlData
+        val startTime = issueForcedMeasurePojo.startTime
+        val endTime = issueForcedMeasurePojo.endTime
+
+        if(hostname.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "hostname cannot be empty", data = null))
+        }
+
+        if(macAddress.isEmpty()){
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "macAddress cannot be empty", data = null))
+        }
+
+
+        if(xmlData.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "xmlData cannot be empty on issue forced measure", data = null))
+        }
+
+        if(startTime.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "startTime cannot be empty", data = null))
+        }
+
+        if(endTime.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "endTime cannot be empty", data = null))
+        }
+
+        return try {
+            val forcedMeasure = proxy.startTrackedFlow(::ForcedIssuer, hostname, macAddress, xmlData, Instant.parse(startTime), Instant.parse(endTime)).returnValue.getOrThrow()
+            ResponseEntity.status(HttpStatus.CREATED).body(ResponsePojo(outcome = "SUCCESS", message = "Transaction id ${forcedMeasure.linearId.id} committed to ledger.\n", data = forcedMeasure))
+        } catch (ex: Throwable) {
+            logger.error(ex.message, ex)
+            ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = ex.message!!, data = null))
+        }
+    }
+
+    /**
+     * Displays History ForcedMeasureStates that exist in the node's vault for selected hostname.
+     */
+    @GetMapping(value = [ "getHistoryForcedMeasureStateByHostname/{hostname}" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getHistoryForcedMeasureStateByHostname(
+            @PathVariable("hostname")
+            hostname : String ) : ResponseEntity<List<StateAndRef<ForcedMeasureState>>> {
+
+        // setting the criteria for retrive CONSUMED and UNCONSUMED state from VAULT
+        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.ALL)
+
+        val foundHostnameForcedMeasures = proxy.vaultQueryBy<ForcedMeasureState>(
+                criteria,
+                PageSpecification(1, MAX_PAGE_SIZE),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states.filter { it.state.data.hostname == hostname }
+
+
+        return ResponseEntity.ok(foundHostnameForcedMeasures)
+    }
+
+    /**
+     * Displays History ForcedMeasureStates that exist in the node's vault for selected macAddress.
+     */
+    @GetMapping(value = [ "getHistoryForcedMeasureStateByMacAddress/{macAddress}" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getHistoryForcedMeasureStateByMacAddress(
+            @PathVariable("macAddress")
+            macAddress : String ) : ResponseEntity<List<StateAndRef<ForcedMeasureState>>> {
+
+        // setting the criteria for retrive CONSUMED and UNCONSUMED state from VAULT
+        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.ALL)
+
+        val foundHostnameForcedMeasures = proxy.vaultQueryBy<ForcedMeasureState>(
+                criteria,
+                PageSpecification(1, MAX_PAGE_SIZE),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states.filter { it.state.data.macAddress == macAddress }
+
+
+        return ResponseEntity.ok(foundHostnameForcedMeasures)
+    }
+
+    /***
+     *
+     * Update ForcedMeasure
+     *
+     */
+    @PostMapping(value = [ "update-forced-measure" ], consumes = [APPLICATION_JSON_VALUE], produces = [ APPLICATION_JSON_VALUE], headers = [ "Content-Type=application/json" ])
+    fun updateForcedMeasure(
+            @RequestBody
+            updateForcedMeasurePojo: UpdateForcedMeasurePojo): ResponseEntity<ResponsePojo> {
+
+        val forcedMeasureLinearId = updateForcedMeasurePojo.forcedMeasureLinearId
+        val hostname = updateForcedMeasurePojo.hostname
+        val macAddress = updateForcedMeasurePojo.macAddress
+        val xmlData = updateForcedMeasurePojo.xmlData
+        val startTime = updateForcedMeasurePojo.startTime
+        val endTime = updateForcedMeasurePojo.endTime
+
+        if(forcedMeasureLinearId.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "forcedMeasureLinearId cannot be empty", data = null))
+        }
+
+        if(hostname.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "hostname cannot be empty", data = null))
+        }
+
+        if(macAddress.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "macAddress cannot be empty", data = null))
+        }
+
+        if(xmlData.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "xmlData cannot be empty", data = null))
+        }
+
+        if(startTime.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "startTime cannot be empty", data = null))
+        }
+
+        if(endTime.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "endTime cannot be empty", data = null))
+        }
+
+        return try {
+            val updateForcedMeasure = proxy.startTrackedFlow(::ForcedUpdater, forcedMeasureLinearId, hostname, macAddress, xmlData, Instant.parse(startTime), Instant.parse(endTime)).returnValue.getOrThrow()
+            ResponseEntity.status(HttpStatus.CREATED).body(ResponsePojo(outcome = "SUCCESS", message = "Measure with id: $forcedMeasureLinearId update correctly. " + "New ForcedMeasureState with id: ${updateForcedMeasure.linearId.id}  created.. ledger updated.\n", data = updateForcedMeasure))
         } catch (ex: Throwable) {
             logger.error(ex.message, ex)
             ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = ex.message!!, data = null))
