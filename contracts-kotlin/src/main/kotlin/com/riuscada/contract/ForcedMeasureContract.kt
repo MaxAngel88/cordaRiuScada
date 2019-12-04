@@ -39,7 +39,6 @@ class ForcedMeasureContract : Contract {
 
             // ForcedMeasure-specific constraints.
             "firstNode and secondNode cannot be the same entity." using (forcedMeasure.firstNode != forcedMeasure.secondNode)
-            "requestTime cannot be in the future." using (forcedMeasure.requestTime < Instant.now())
             "startTime cannot be empty" using (forcedMeasure.startTime.toString().isNotEmpty())
             "endTime cannot be empty" using (forcedMeasure.endTime.toString().isNotEmpty())
             "startTime cannot be after endTime" using (forcedMeasure.startTime.isBefore(forcedMeasure.endTime))
