@@ -4,7 +4,6 @@ import com.riuscada.state.ForcedMeasureState
 import net.corda.core.contracts.*
 import net.corda.core.transactions.LedgerTransaction
 import java.security.PublicKey
-import java.time.Instant
 
 class ForcedMeasureContract : Contract {
     companion object {
@@ -64,7 +63,6 @@ class ForcedMeasureContract : Contract {
             "firstNode and secondNode cannot be the same entity" using (newForcedMeasureState.firstNode != newForcedMeasureState.secondNode)
             "old hostname must be the same of the new hostname" using (oldForcedMeasureState.hostname == newForcedMeasureState.hostname)
             "old macAddress must be the same of the new macAddress" using (oldForcedMeasureState.macAddress == newForcedMeasureState.macAddress)
-            "requestTime cannot be in the future." using (newForcedMeasureState.requestTime < Instant.now())
             "xmlData cannot be empty." using (newForcedMeasureState.xmlData.isNotEmpty())
             "old xmlData cannot be the same of the new xmlData" using (oldForcedMeasureState.xmlData != newForcedMeasureState.xmlData)
             "startTime cannot be empty" using (newForcedMeasureState.startTime.toString().isNotEmpty())
