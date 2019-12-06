@@ -4,10 +4,13 @@ import com.riuscada.flow.MeasureFlow.Issuer
 import com.riuscada.flow.MeasureFlow.Updater
 import com.riuscada.flow.CommandFlow.IssuerCommand
 import com.riuscada.flow.CommandFlow.UpdaterCommand
+import com.riuscada.flow.FlowComputerFlow.FlowComputerIssuer
+import com.riuscada.flow.FlowComputerFlow.FlowComputerUpdater
 import com.riuscada.flow.ForcedMeasureFlow.ForcedIssuer
 import com.riuscada.flow.ForcedMeasureFlow.ForcedUpdater
 import com.riuscada.server.pojo.*
 import com.riuscada.state.CommandState
+import com.riuscada.state.FlowComputerState
 import com.riuscada.state.ForcedMeasureState
 import com.riuscada.state.MeasureState
 import net.corda.core.contracts.StateAndRef
@@ -633,6 +636,182 @@ class Controller(rpc: NodeRPCConnection) {
         return try {
             val updateForcedMeasure = proxy.startTrackedFlow(::ForcedUpdater, forcedMeasureLinearId, hostname, macAddress, xmlData, Instant.parse(startTime), Instant.parse(endTime)).returnValue.getOrThrow()
             ResponseEntity.status(HttpStatus.CREATED).body(ResponsePojo(outcome = "SUCCESS", message = "Measure with id: $forcedMeasureLinearId update correctly. " + "New ForcedMeasureState with id: ${updateForcedMeasure.linearId.id}  created.. ledger updated.\n", data = updateForcedMeasure))
+        } catch (ex: Throwable) {
+            logger.error(ex.message, ex)
+            ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = ex.message!!, data = null))
+        }
+    }
+
+    /**
+     *
+     * FLOW COMPUTER API -----------------------------------------------------------------------------------------------
+     *
+     */
+
+    /**
+     * Displays all FlowComputerStates that exist in the node's vault.
+     */
+    @GetMapping(value = [ "getLastFlowComputer" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getLastFlowComputer() : ResponseEntity<List<StateAndRef<FlowComputerState>>> {
+        return ResponseEntity.ok(proxy.vaultQueryBy<FlowComputerState>().states)
+    }
+
+    /**
+     * Displays last FlowComputerStates that exist in the node's vault for selected hostname.
+     */
+    @GetMapping(value = [ "getLastFlowComputerByHostname/{hostname}" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getLastFlowComputerByHostname(
+            @PathVariable("hostname")
+            hostname : String ) : ResponseEntity<List<StateAndRef<FlowComputerState>>> {
+
+        // setting the criteria for retrive UNCONSUMED state from VAULT
+        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+
+        val foundHostnameFlowComputer = proxy.vaultQueryBy<FlowComputerState>(
+                criteria,
+                PageSpecification(1, MAX_PAGE_SIZE),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states.filter { it.state.data.hostname == hostname }
+
+        return ResponseEntity.ok(foundHostnameFlowComputer)
+    }
+
+    /**
+     * Displays last FlowComputerStates that exist in the node's vault for selected macAddress.
+     */
+    @GetMapping(value = [ "getLastFlowComputerByMacAddress/{macAddress}" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getLastFlowComputerByMacAddress(
+            @PathVariable("macAddress")
+            macAddress : String ) : ResponseEntity<List<StateAndRef<FlowComputerState>>> {
+
+        // setting the criteria for retrive UNCONSUMED state from VAULT
+        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+
+        val foundMacAddressFlowComputer = proxy.vaultQueryBy<FlowComputerState>(
+                criteria,
+                PageSpecification(1, MAX_PAGE_SIZE),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states.filter { it.state.data.macAddress == macAddress }
+
+        return ResponseEntity.ok(foundMacAddressFlowComputer)
+    }
+
+    /**
+     * Initiates a flow to agree an FlowComputer between two nodes.
+     *
+     * Once the flow finishes it will have written the Measure to ledger. Both NodeA, NodeB are able to
+     * see it when calling /spring/riuscada.com/api/ on their respective nodes.
+     *
+     * This end-point takes a Party name parameter as part of the path. If the serving node can't find the other party
+     * in its network map cache, it will return an HTTP bad request.
+     *
+     * The flow is invoked asynchronously. It returns a future when the flow's call() method returns.
+     */
+    @PostMapping(value = [ "issue-flow-computer" ], produces = [ APPLICATION_JSON_VALUE ], headers = [ "Content-Type=application/json" ])
+    fun issueFlowComputer(
+            @RequestBody
+            issueFlowComputerPojo : IssueFlowComputerPojo): ResponseEntity<ResponsePojo> {
+        val hostname = issueFlowComputerPojo.hostname
+        val macAddress = issueFlowComputerPojo.macAddress
+        val binaryData = issueFlowComputerPojo.binaryData
+
+        if(hostname.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "hostname cannot be empty", data = null))
+        }
+
+        if(macAddress.isEmpty()){
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "macAddress cannot be empty", data = null))
+        }
+
+        if(binaryData.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "binaryData cannot be empty on issue flow computer", data = null))
+        }
+
+        return try {
+            val flowComputer = proxy.startTrackedFlow(::FlowComputerIssuer, hostname, macAddress, binaryData).returnValue.getOrThrow()
+            ResponseEntity.status(HttpStatus.CREATED).body(ResponsePojo(outcome = "SUCCESS", message = "Transaction id ${flowComputer.linearId.id} committed to ledger.\n", data = flowComputer))
+        } catch (ex: Throwable) {
+            logger.error(ex.message, ex)
+            ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = ex.message!!, data = null))
+        }
+    }
+
+    /**
+     * Displays History FlowComputerStates that exist in the node's vault for selected hostname.
+     */
+    @GetMapping(value = [ "getHistoryFlowComputerStateByHostname/{hostname}" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getHistoryFlowComputerStateByHostname(
+            @PathVariable("hostname")
+            hostname : String ) : ResponseEntity<List<StateAndRef<FlowComputerState>>> {
+
+        // setting the criteria for retrive CONSUMED and UNCONSUMED state from VAULT
+        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.ALL)
+
+        val foundHostnameFlowComputer = proxy.vaultQueryBy<FlowComputerState>(
+                criteria,
+                PageSpecification(1, MAX_PAGE_SIZE),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states.filter { it.state.data.hostname == hostname }
+
+
+        return ResponseEntity.ok(foundHostnameFlowComputer)
+    }
+
+    /**
+     * Displays History FlowComputerStates that exist in the node's vault for selected macAddress.
+     */
+    @GetMapping(value = [ "getHistoryFlowComputerStateByMacAddress/{macAddress}" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getHistoryFlowComputerStateByMacAddress(
+            @PathVariable("macAddress")
+            macAddress : String ) : ResponseEntity<List<StateAndRef<FlowComputerState>>> {
+
+        // setting the criteria for retrive CONSUMED and UNCONSUMED state from VAULT
+        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.ALL)
+
+        val foundHostnameFlowComputer = proxy.vaultQueryBy<FlowComputerState>(
+                criteria,
+                PageSpecification(1, MAX_PAGE_SIZE),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states.filter { it.state.data.macAddress == macAddress }
+
+
+        return ResponseEntity.ok(foundHostnameFlowComputer)
+    }
+
+    /***
+     *
+     * Update FlowComputer
+     *
+     */
+    @PostMapping(value = [ "update-flow-computer" ], consumes = [APPLICATION_JSON_VALUE], produces = [ APPLICATION_JSON_VALUE], headers = [ "Content-Type=application/json" ])
+    fun updateFlowComputer(
+            @RequestBody
+            updateFlowComputerPojo: UpdateFlowComputerPojo): ResponseEntity<ResponsePojo> {
+
+        val flowComputerLinearId = updateFlowComputerPojo.flowComputerLinearId
+        val hostname = updateFlowComputerPojo.hostname
+        val macAddress = updateFlowComputerPojo.macAddress
+        val binaryData = updateFlowComputerPojo.binaryData
+
+        if(flowComputerLinearId.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "flowComputerLinearId cannot be empty", data = null))
+        }
+
+        if(hostname.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "hostname cannot be empty", data = null))
+        }
+
+        if(macAddress.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "macAddress cannot be empty", data = null))
+        }
+
+        if(binaryData.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "binaryData cannot be empty", data = null))
+        }
+
+        return try {
+            val updateFlowComputer = proxy.startTrackedFlow(::FlowComputerUpdater, flowComputerLinearId, hostname, macAddress, binaryData).returnValue.getOrThrow()
+            ResponseEntity.status(HttpStatus.CREATED).body(ResponsePojo(outcome = "SUCCESS", message = "FlowComputer with id: $flowComputerLinearId update correctly. " + "New FlowComputerState with id: ${updateFlowComputer.linearId.id}  created.. ledger updated.\n", data = updateFlowComputer))
         } catch (ex: Throwable) {
             logger.error(ex.message, ex)
             ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = ex.message!!, data = null))
