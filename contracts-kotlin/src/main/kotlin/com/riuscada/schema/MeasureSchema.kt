@@ -6,6 +6,7 @@ import java.time.Instant
 import java.util.*
 import javax.persistence.Column
 import javax.persistence.Entity
+import javax.persistence.Lob
 import javax.persistence.Table
 
 /**
@@ -39,7 +40,8 @@ object MeasureSchemaV1 : MappedSchema(
             @Column(name = "time")
             var time: Instant,
 
-            @Column(name = "xmlData", length = 65535)
+            @Column(name = "xmlData")
+            @Lob
             var xmlData: String,
 
             @Column(name = "linear_id")

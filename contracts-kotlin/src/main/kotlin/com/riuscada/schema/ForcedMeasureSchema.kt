@@ -6,6 +6,7 @@ import java.time.Instant
 import java.util.*
 import javax.persistence.Column
 import javax.persistence.Entity
+import javax.persistence.Lob
 import javax.persistence.Table
 
 /**
@@ -39,7 +40,8 @@ object ForcedMeasureSchemaV1 : MappedSchema(
             @Column(name = "request_time")
             var requestTime: Instant,
 
-            @Column(name = "xmlData", length = 65535)
+            @Column(name = "xmlData")
+            @Lob
             var xmlData: String,
 
             @Column(name = "start_time")

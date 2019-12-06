@@ -6,6 +6,7 @@ import java.time.Instant
 import java.util.*
 import javax.persistence.Column
 import javax.persistence.Entity
+import javax.persistence.Lob
 import javax.persistence.Table
 
 /**
@@ -39,7 +40,8 @@ object CommandSchemaV1 : MappedSchema(
             @Column(name = "time")
             var time: Instant,
 
-            @Column(name = "xmlCommandData", length = 65535)
+            @Column(name = "xmlCommandData")
+            @Lob
             var xmlCommandData: String,
 
             @Column(name = "status")
