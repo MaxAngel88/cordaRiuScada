@@ -44,10 +44,13 @@ object MeasureSchemaV1 : MappedSchema(
             @Lob
             var xmlData: String,
 
+            @Column(name = "uuid")
+            var uuid: String,
+
             @Column(name = "linear_id")
             var linearId: UUID
     ) : PersistentState() {
         // Default constructor required by hibernate.
-        constructor(): this(firstNode = "", secondNode = "", hostname = "", macAddress = "", time = Instant.now(), xmlData = "", linearId = UUID.randomUUID())
+        constructor(): this(firstNode = "", secondNode = "", hostname = "", macAddress = "", time = Instant.now(), xmlData = "", uuid= "", linearId = UUID.randomUUID())
     }
 }

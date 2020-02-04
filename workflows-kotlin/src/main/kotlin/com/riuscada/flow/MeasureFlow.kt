@@ -100,6 +100,7 @@ object MeasureFlow {
                     macAddress,
                     time,
                     xmlData,
+                    "",
                     UniqueIdentifier(id = UUID.randomUUID()))
 
 
@@ -167,7 +168,8 @@ object MeasureFlow {
                   val hostname: String,
                   val macAddress: String,
                   val time: Instant,
-                  val xmlData: String) : FlowLogic<MeasureState>() {
+                  val xmlData: String,
+                  val uuid: String) : FlowLogic<MeasureState>() {
         /**
          * The progress tracker checkpoints each stage of the flow and outputs the specified messages when each
          * checkpoint is reached in the code. See the 'progressTracker.currentStep' expressions within the call() function.
@@ -253,6 +255,7 @@ object MeasureFlow {
                     macAddress,
                     time,
                     xmlData,
+                    uuid,
                     UniqueIdentifier(id = UUID.randomUUID())
             )
 
@@ -314,6 +317,7 @@ object MeasureFlow {
                         "measure hostname cannot be empty" using (measure.hostname.isNotEmpty())
                         "measure macAddress cannot be empty" using (measure.macAddress.isNotEmpty())
                         "measure xmlData cannot be empty on creation" using (measure.xmlData.isNotEmpty())
+                        "measure uuid cannot be empty on update" using (measure.uuid.isNotEmpty())
                     }
                 }
                 val txId = subFlow(signTransactionFlow).id

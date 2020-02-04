@@ -219,6 +219,7 @@ class Controller(rpc: NodeRPCConnection) {
         val macAddress = updateMeasurePojo.macAddress
         val time = updateMeasurePojo.time
         val xmlData = updateMeasurePojo.xmlData
+        val uuid = updateMeasurePojo.uuid
 
         if(measureLinearId.isEmpty()) {
             return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "measureLinearId cannot be empty", data = null))
@@ -240,8 +241,12 @@ class Controller(rpc: NodeRPCConnection) {
             return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "xmlData cannot be empty", data = null))
         }
 
+        if(uuid.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "uuid cannot be empty", data = null))
+        }
+
         return try {
-            val updateMeasure = proxy.startTrackedFlow(::Updater, measureLinearId, hostname, macAddress, Instant.parse(time), xmlData).returnValue.getOrThrow()
+            val updateMeasure = proxy.startTrackedFlow(::Updater, measureLinearId, hostname, macAddress, Instant.parse(time), xmlData, uuid).returnValue.getOrThrow()
             ResponseEntity.status(HttpStatus.CREATED).body(ResponsePojo(outcome = "SUCCESS", message = "Measure with id: $measureLinearId update correctly. " + "New MeasureState with id: ${updateMeasure.linearId.id}  created.. ledger updated.\n", data = updateMeasure))
         } catch (ex: Throwable) {
             logger.error(ex.message, ex)

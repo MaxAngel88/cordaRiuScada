@@ -8,5 +8,6 @@ data class UpdateMeasurePojo(
         val hostname: String = "",
         val macAddress: String = "",
         val time: String = "",
-        val xmlData: String = ""
+        val xmlData: String = "",
+        val uuid: String = ""
 )

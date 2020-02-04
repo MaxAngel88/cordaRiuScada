@@ -41,6 +41,7 @@ class MeasureContract : Contract {
             "firstNode and secondNode cannot be the same entity." using (measure.firstNode != measure.secondNode)
             "time cannot be in the future." using (measure.time < Instant.now())
             "xmlData must be empty." using (measure.xmlData.isNullOrEmpty())
+            "uuid must be empty" using (measure.uuid.isNullOrEmpty())
             "hostname cannot be empty" using (measure.hostname.isNotEmpty())
             "macAddress cannot be empty" using (measure.macAddress.isNotEmpty())
         }
@@ -63,6 +64,7 @@ class MeasureContract : Contract {
             "old hostname must be the same of the new hostname" using (oldMeasureState.hostname == newMeasureState.hostname)
             "old macAddress must be the same of the new macAddress" using (oldMeasureState.macAddress == newMeasureState.macAddress)
             "old xmlData cannot be the same of the new xmlData" using (oldMeasureState.xmlData != newMeasureState.xmlData)
+            "new uuid cannot be empty" using (newMeasureState.uuid.isNotEmpty())
         }
     }
 

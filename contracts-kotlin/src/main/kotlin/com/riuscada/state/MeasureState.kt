@@ -19,6 +19,7 @@ data class MeasureState(val firstNode: Party,
                         val macAddress: String,
                         val time: Instant,
                         val xmlData: String,
+                        val uuid: String,
                         override val linearId: UniqueIdentifier = UniqueIdentifier()):
         LinearState, QueryableState {
 
@@ -34,6 +35,7 @@ data class MeasureState(val firstNode: Party,
                     this.macAddress,
                     this.time,
                     this.xmlData,
+                    this.uuid,
                     this.linearId.id
             )
             else -> throw IllegalArgumentException("Unrecognised schema $schema")

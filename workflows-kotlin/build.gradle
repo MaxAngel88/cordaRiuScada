@@ -91,6 +91,7 @@ task deployNodes(type: Cordform, dependsOn: ['jar']) {
     node {
         name "O=NodeA,L=Milan,C=IT"
         p2pPort 10004
+        h2Port 10015
         rpcSettings {
             address("localhost:10005")
             adminAddress("localhost:10006")
@@ -100,6 +101,7 @@ task deployNodes(type: Cordform, dependsOn: ['jar']) {
     node {
         name "O=NodeB,L=Milan,C=IT"
         p2pPort 10008
+        h2Port 10019
         rpcSettings {
             address("localhost:10009")
             adminAddress("localhost:10010")
