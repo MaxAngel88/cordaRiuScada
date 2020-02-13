@@ -1,13 +1,17 @@
 package com.riuscada.server
 
-import com.riuscada.flow.MeasureFlow.Issuer
-import com.riuscada.flow.MeasureFlow.Updater
 import com.riuscada.flow.CommandFlow.IssuerCommand
 import com.riuscada.flow.CommandFlow.UpdaterCommand
 import com.riuscada.flow.FlowComputerFlow.FlowComputerIssuer
 import com.riuscada.flow.FlowComputerFlow.FlowComputerUpdater
 import com.riuscada.flow.ForcedMeasureFlow.ForcedIssuer
 import com.riuscada.flow.ForcedMeasureFlow.ForcedUpdater
+import com.riuscada.flow.MeasureFlow.Issuer
+import com.riuscada.flow.MeasureFlow.Updater
+import com.riuscada.schema.CommandSchemaV1
+import com.riuscada.schema.FlowComputerSchemaV1
+import com.riuscada.schema.ForcedMeasureSchemaV1
+import com.riuscada.schema.MeasureSchemaV1
 import com.riuscada.server.pojo.*
 import com.riuscada.state.CommandState
 import com.riuscada.state.FlowComputerState
@@ -26,7 +30,6 @@ import org.springframework.http.MediaType.APPLICATION_JSON_VALUE
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import java.time.Instant
-import javax.servlet.http.HttpServletRequest
 
 val SERVICE_NAMES = listOf("Notary", "Network Map Service")
 
@@ -75,7 +78,7 @@ class Controller(rpc: NodeRPCConnection) {
      */
     @GetMapping(value = [ "getLastMeasures" ], produces = [ APPLICATION_JSON_VALUE ])
     fun getLastMeasures() : ResponseEntity<List<StateAndRef<MeasureState>>> {
-        return ResponseEntity.ok(proxy.vaultQueryBy<MeasureState>().states)
+        return ResponseEntity.ok(proxy.vaultQueryBy<MeasureState>(paging = PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000)).states)
     }
 
     /**
@@ -86,14 +89,15 @@ class Controller(rpc: NodeRPCConnection) {
             @PathVariable("hostname")
             hostname : String ) : ResponseEntity<List<StateAndRef<MeasureState>>> {
 
-        // setting the criteria for retrive UNCONSUMED state from VAULT
-        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+        // setting the criteria for retrive UNCONSUMED state AND filter it for hostname
+        var hostnameCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {MeasureSchemaV1.PersistentMeasure::hostname.equal(hostname)}, status = Vault.StateStatus.UNCONSUMED, contractStateTypes = setOf(MeasureState::class.java))
 
         val foundHostnameMeasures = proxy.vaultQueryBy<MeasureState>(
-                criteria,
-                PageSpecification(1, MAX_PAGE_SIZE),
+                hostnameCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
-        ).states.filter { it.state.data.hostname == hostname }
+        ).states
+                //.filter { it.state.data.hostname == hostname }
 
         return ResponseEntity.ok(foundHostnameMeasures)
     }
@@ -106,14 +110,15 @@ class Controller(rpc: NodeRPCConnection) {
             @PathVariable("macAddress")
             macAddress : String ) : ResponseEntity<List<StateAndRef<MeasureState>>> {
 
-        // setting the criteria for retrive UNCONSUMED state from VAULT
-        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+        // setting the criteria for retrive UNCONSUMED state AND filter it for macAddress
+        var macAddressCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {MeasureSchemaV1.PersistentMeasure::macAddress.equal(macAddress)}, status = Vault.StateStatus.UNCONSUMED, contractStateTypes = setOf(MeasureState::class.java))
 
         val foundMacAddressMeasures = proxy.vaultQueryBy<MeasureState>(
-                criteria,
-                PageSpecification(1, MAX_PAGE_SIZE),
+                macAddressCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
-        ).states.filter { it.state.data.macAddress == macAddress }
+        ).states
+                //.filter { it.state.data.macAddress == macAddress }
 
         return ResponseEntity.ok(foundMacAddressMeasures)
     }
@@ -170,14 +175,16 @@ class Controller(rpc: NodeRPCConnection) {
             @PathVariable("hostname")
             hostname : String ) : ResponseEntity<List<StateAndRef<MeasureState>>> {
 
-        // setting the criteria for retrive CONSUMED and UNCONSUMED state from VAULT
-        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.ALL)
+        // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for hostname
+        var hostnameCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {MeasureSchemaV1.PersistentMeasure::hostname.equal(hostname)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(MeasureState::class.java))
+
 
         val foundHostnameMeasures = proxy.vaultQueryBy<MeasureState>(
-                criteria,
-                PageSpecification(1, MAX_PAGE_SIZE),
+                hostnameCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
-        ).states.filter { it.state.data.hostname == hostname }
+        ).states
+                //.filter { it.state.data.hostname == hostname }
 
 
         return ResponseEntity.ok(foundHostnameMeasures)
@@ -191,15 +198,15 @@ class Controller(rpc: NodeRPCConnection) {
             @PathVariable("macAddress")
             macAddress : String ) : ResponseEntity<List<StateAndRef<MeasureState>>> {
 
-        // setting the criteria for retrive CONSUMED and UNCONSUMED state from VAULT
-        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.ALL)
+        // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for macAddress
+        var macAddressCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {MeasureSchemaV1.PersistentMeasure::macAddress.equal(macAddress)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(MeasureState::class.java))
 
         val foundHostnameMeasures = proxy.vaultQueryBy<MeasureState>(
-                criteria,
-                PageSpecification(1, MAX_PAGE_SIZE),
+                macAddressCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
-        ).states.filter { it.state.data.macAddress == macAddress }
-
+        ).states
+                //.filter { it.state.data.macAddress == macAddress }
 
         return ResponseEntity.ok(foundHostnameMeasures)
     }
@@ -265,7 +272,7 @@ class Controller(rpc: NodeRPCConnection) {
      */
     @GetMapping(value = [ "getLastCommands" ], produces = [ APPLICATION_JSON_VALUE ])
     fun getLastCommand() : ResponseEntity<List<StateAndRef<CommandState>>> {
-        return ResponseEntity.ok(proxy.vaultQueryBy<CommandState>().states)
+        return ResponseEntity.ok(proxy.vaultQueryBy<CommandState>(paging = PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000)).states)
     }
 
     /**
@@ -276,14 +283,15 @@ class Controller(rpc: NodeRPCConnection) {
             @PathVariable("hostname")
             hostname : String ) : ResponseEntity<List<StateAndRef<CommandState>>> {
 
-        // setting the criteria for retrive UNCONSUMED state from VAULT
-        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+        // setting the criteria for retrive UNCONSUMED state AND filter it for hostname
+        var hostnameCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {CommandSchemaV1.PersistentCommand::hostname.equal(hostname)}, status = Vault.StateStatus.UNCONSUMED, contractStateTypes = setOf(CommandState::class.java))
 
         val foundHostnameCommands = proxy.vaultQueryBy<CommandState>(
-                criteria,
-                PageSpecification(1, MAX_PAGE_SIZE),
+                hostnameCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
-        ).states.filter { it.state.data.hostname == hostname }
+        ).states
+                //.filter { it.state.data.hostname == hostname }
 
         return ResponseEntity.ok(foundHostnameCommands)
     }
@@ -296,14 +304,15 @@ class Controller(rpc: NodeRPCConnection) {
             @PathVariable("macAddress")
             macAddress : String ) : ResponseEntity<List<StateAndRef<CommandState>>> {
 
-        // setting the criteria for retrive UNCONSUMED state from VAULT
-        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+        // setting the criteria for retrive UNCONSUMED state AND filter it for macAddress
+        var macAddressCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {CommandSchemaV1.PersistentCommand::macAddress.equal(macAddress)}, status = Vault.StateStatus.UNCONSUMED, contractStateTypes = setOf(CommandState::class.java))
 
         val foundMacAddressCommands = proxy.vaultQueryBy<CommandState>(
-                criteria,
-                PageSpecification(1, MAX_PAGE_SIZE),
+                macAddressCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
-        ).states.filter { it.state.data.macAddress == macAddress }
+        ).states
+                //.filter { it.state.data.macAddress == macAddress }
 
         return ResponseEntity.ok(foundMacAddressCommands)
     }
@@ -366,15 +375,15 @@ class Controller(rpc: NodeRPCConnection) {
             @PathVariable("hostname")
             hostname : String ) : ResponseEntity<List<StateAndRef<CommandState>>> {
 
-        // setting the criteria for retrive CONSUMED and UNCONSUMED state from VAULT
-        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.ALL)
+        // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for hostname
+        var hostnameCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {CommandSchemaV1.PersistentCommand::hostname.equal(hostname)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(CommandState::class.java))
 
         val foundHostnameCommands = proxy.vaultQueryBy<CommandState>(
-                criteria,
-                PageSpecification(1, MAX_PAGE_SIZE),
+                hostnameCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
-        ).states.filter { it.state.data.hostname == hostname }
-
+        ).states
+                //.filter { it.state.data.hostname == hostname }
 
         return ResponseEntity.ok(foundHostnameCommands)
     }
@@ -387,15 +396,15 @@ class Controller(rpc: NodeRPCConnection) {
             @PathVariable("macAddress")
             macAddress : String ) : ResponseEntity<List<StateAndRef<CommandState>>> {
 
-        // setting the criteria for retrive CONSUMED and UNCONSUMED state from VAULT
-        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.ALL)
+        // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for macAddress
+        var macAddressCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {CommandSchemaV1.PersistentCommand::macAddress.equal(macAddress)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(CommandState::class.java))
 
         val foundHostnameCommands = proxy.vaultQueryBy<CommandState>(
-                criteria,
-                PageSpecification(1, MAX_PAGE_SIZE),
+                macAddressCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
-        ).states.filter { it.state.data.macAddress == macAddress }
-
+        ).states
+                //.filter { it.state.data.macAddress == macAddress }
 
         return ResponseEntity.ok(foundHostnameCommands)
     }
@@ -461,7 +470,7 @@ class Controller(rpc: NodeRPCConnection) {
      */
     @GetMapping(value = [ "getLastForcedMeasures" ], produces = [ APPLICATION_JSON_VALUE ])
     fun getLastForcedMeasures() : ResponseEntity<List<StateAndRef<ForcedMeasureState>>> {
-        return ResponseEntity.ok(proxy.vaultQueryBy<ForcedMeasureState>().states)
+        return ResponseEntity.ok(proxy.vaultQueryBy<ForcedMeasureState>(paging = PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000)).states)
     }
 
     /**
@@ -472,14 +481,15 @@ class Controller(rpc: NodeRPCConnection) {
             @PathVariable("hostname")
             hostname : String ) : ResponseEntity<List<StateAndRef<ForcedMeasureState>>> {
 
-        // setting the criteria for retrive UNCONSUMED state from VAULT
-        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+        // setting the criteria for retrive UNCONSUMED state AND filter it for hostname
+        var hostnameCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {ForcedMeasureSchemaV1.PersistentForcedMeasure::hostname.equal(hostname)}, status = Vault.StateStatus.UNCONSUMED, contractStateTypes = setOf(ForcedMeasureState::class.java))
 
         val foundHostnameForcedMeasures = proxy.vaultQueryBy<ForcedMeasureState>(
-                criteria,
-                PageSpecification(1, MAX_PAGE_SIZE),
+                hostnameCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
-        ).states.filter { it.state.data.hostname == hostname }
+        ).states
+                //.filter { it.state.data.hostname == hostname }
 
         return ResponseEntity.ok(foundHostnameForcedMeasures)
     }
@@ -492,14 +502,15 @@ class Controller(rpc: NodeRPCConnection) {
             @PathVariable("macAddress")
             macAddress : String ) : ResponseEntity<List<StateAndRef<ForcedMeasureState>>> {
 
-        // setting the criteria for retrive UNCONSUMED state from VAULT
-        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+        // setting the criteria for retrive UNCONSUMED state AND filter it for macAddress
+        var macAddressCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {ForcedMeasureSchemaV1.PersistentForcedMeasure::macAddress.equal(macAddress)}, status = Vault.StateStatus.UNCONSUMED, contractStateTypes = setOf(ForcedMeasureState::class.java))
 
         val foundMacAddressForcedMeasures = proxy.vaultQueryBy<ForcedMeasureState>(
-                criteria,
-                PageSpecification(1, MAX_PAGE_SIZE),
+                macAddressCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
-        ).states.filter { it.state.data.macAddress == macAddress }
+        ).states
+                //.filter { it.state.data.macAddress == macAddress }
 
         return ResponseEntity.ok(foundMacAddressForcedMeasures)
     }
@@ -563,15 +574,15 @@ class Controller(rpc: NodeRPCConnection) {
             @PathVariable("hostname")
             hostname : String ) : ResponseEntity<List<StateAndRef<ForcedMeasureState>>> {
 
-        // setting the criteria for retrive CONSUMED and UNCONSUMED state from VAULT
-        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.ALL)
+        // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for hostname
+        var hostnameCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {ForcedMeasureSchemaV1.PersistentForcedMeasure::hostname.equal(hostname)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(ForcedMeasureState::class.java))
 
         val foundHostnameForcedMeasures = proxy.vaultQueryBy<ForcedMeasureState>(
-                criteria,
-                PageSpecification(1, MAX_PAGE_SIZE),
+                hostnameCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
-        ).states.filter { it.state.data.hostname == hostname }
-
+        ).states
+                //.filter { it.state.data.hostname == hostname }
 
         return ResponseEntity.ok(foundHostnameForcedMeasures)
     }
@@ -584,15 +595,15 @@ class Controller(rpc: NodeRPCConnection) {
             @PathVariable("macAddress")
             macAddress : String ) : ResponseEntity<List<StateAndRef<ForcedMeasureState>>> {
 
-        // setting the criteria for retrive CONSUMED and UNCONSUMED state from VAULT
-        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.ALL)
+        // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for macAddress
+        var macAddressCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {ForcedMeasureSchemaV1.PersistentForcedMeasure::macAddress.equal(macAddress)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(ForcedMeasureState::class.java))
 
         val foundHostnameForcedMeasures = proxy.vaultQueryBy<ForcedMeasureState>(
-                criteria,
-                PageSpecification(1, MAX_PAGE_SIZE),
+                macAddressCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
-        ).states.filter { it.state.data.macAddress == macAddress }
-
+        ).states
+                //.filter { it.state.data.macAddress == macAddress }
 
         return ResponseEntity.ok(foundHostnameForcedMeasures)
     }
@@ -658,7 +669,7 @@ class Controller(rpc: NodeRPCConnection) {
      */
     @GetMapping(value = [ "getLastFlowComputer" ], produces = [ APPLICATION_JSON_VALUE ])
     fun getLastFlowComputer() : ResponseEntity<List<StateAndRef<FlowComputerState>>> {
-        return ResponseEntity.ok(proxy.vaultQueryBy<FlowComputerState>().states)
+        return ResponseEntity.ok(proxy.vaultQueryBy<FlowComputerState>(paging = PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000)).states)
     }
 
     /**
@@ -669,14 +680,15 @@ class Controller(rpc: NodeRPCConnection) {
             @PathVariable("hostname")
             hostname : String ) : ResponseEntity<List<StateAndRef<FlowComputerState>>> {
 
-        // setting the criteria for retrive UNCONSUMED state from VAULT
-        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+        // setting the criteria for retrive UNCONSUMED state AND filter it for hostname
+        var hostnameCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {FlowComputerSchemaV1.PersistentFlowComputer::hostname.equal(hostname)}, status = Vault.StateStatus.UNCONSUMED, contractStateTypes = setOf(FlowComputerState::class.java))
 
         val foundHostnameFlowComputer = proxy.vaultQueryBy<FlowComputerState>(
-                criteria,
-                PageSpecification(1, MAX_PAGE_SIZE),
+                hostnameCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
-        ).states.filter { it.state.data.hostname == hostname }
+        ).states
+                //.filter { it.state.data.hostname == hostname }
 
         return ResponseEntity.ok(foundHostnameFlowComputer)
     }
@@ -689,14 +701,15 @@ class Controller(rpc: NodeRPCConnection) {
             @PathVariable("macAddress")
             macAddress : String ) : ResponseEntity<List<StateAndRef<FlowComputerState>>> {
 
-        // setting the criteria for retrive UNCONSUMED state from VAULT
-        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+        // setting the criteria for retrive UNCONSUMED state AND filter it for macAddress
+        var macAddressCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {FlowComputerSchemaV1.PersistentFlowComputer::macAddress.equal(macAddress)}, status = Vault.StateStatus.UNCONSUMED, contractStateTypes = setOf(FlowComputerState::class.java))
 
         val foundMacAddressFlowComputer = proxy.vaultQueryBy<FlowComputerState>(
-                criteria,
-                PageSpecification(1, MAX_PAGE_SIZE),
+                macAddressCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
-        ).states.filter { it.state.data.macAddress == macAddress }
+        ).states
+                //.filter { it.state.data.macAddress == macAddress }
 
         return ResponseEntity.ok(foundMacAddressFlowComputer)
     }
@@ -749,15 +762,15 @@ class Controller(rpc: NodeRPCConnection) {
             @PathVariable("hostname")
             hostname : String ) : ResponseEntity<List<StateAndRef<FlowComputerState>>> {
 
-        // setting the criteria for retrive CONSUMED and UNCONSUMED state from VAULT
-        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.ALL)
+        // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for hostname
+        var hostnameCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {FlowComputerSchemaV1.PersistentFlowComputer::hostname.equal(hostname)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(FlowComputerState::class.java))
 
         val foundHostnameFlowComputer = proxy.vaultQueryBy<FlowComputerState>(
-                criteria,
-                PageSpecification(1, MAX_PAGE_SIZE),
+                hostnameCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
-        ).states.filter { it.state.data.hostname == hostname }
-
+        ).states
+                //.filter { it.state.data.hostname == hostname }
 
         return ResponseEntity.ok(foundHostnameFlowComputer)
     }
@@ -770,15 +783,15 @@ class Controller(rpc: NodeRPCConnection) {
             @PathVariable("macAddress")
             macAddress : String ) : ResponseEntity<List<StateAndRef<FlowComputerState>>> {
 
-        // setting the criteria for retrive CONSUMED and UNCONSUMED state from VAULT
-        var criteria : QueryCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.ALL)
+        // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for macAddress
+        var macAddressCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {FlowComputerSchemaV1.PersistentFlowComputer::macAddress.equal(macAddress)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(FlowComputerState::class.java))
 
         val foundHostnameFlowComputer = proxy.vaultQueryBy<FlowComputerState>(
-                criteria,
-                PageSpecification(1, MAX_PAGE_SIZE),
+                macAddressCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
-        ).states.filter { it.state.data.macAddress == macAddress }
-
+        ).states
+                //.filter { it.state.data.macAddress == macAddress }
 
         return ResponseEntity.ok(foundHostnameFlowComputer)
     }
