@@ -77,8 +77,10 @@ class Controller(rpc: NodeRPCConnection) {
      * Displays all MeasureStates that exist in the node's vault.
      */
     @GetMapping(value = [ "getLastMeasures" ], produces = [ APPLICATION_JSON_VALUE ])
-    fun getLastMeasures() : ResponseEntity<List<StateAndRef<MeasureState>>> {
-        return ResponseEntity.ok(proxy.vaultQueryBy<MeasureState>(paging = PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000)).states)
+    fun getLastMeasures() : ResponseEntity<ResponseCounterPojo> {
+        var foundLastMeasureStates = proxy.vaultQueryBy<MeasureState>(
+                paging = PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000)).states
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of registered rius", size = foundLastMeasureStates.size))
     }
 
     /**
@@ -173,7 +175,7 @@ class Controller(rpc: NodeRPCConnection) {
     @GetMapping(value = [ "getHistoryMeasureStateByHostname/{hostname}" ], produces = [ APPLICATION_JSON_VALUE ])
     fun getHistoryMeasureStateByHostname(
             @PathVariable("hostname")
-            hostname : String ) : ResponseEntity<List<StateAndRef<MeasureState>>> {
+            hostname : String ) : ResponseEntity<ResponseCounterPojo> {
 
         // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for hostname
         var hostnameCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {MeasureSchemaV1.PersistentMeasure::hostname.equal(hostname)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(MeasureState::class.java))
@@ -187,7 +189,7 @@ class Controller(rpc: NodeRPCConnection) {
                 //.filter { it.state.data.hostname == hostname }
 
 
-        return ResponseEntity.ok(foundHostnameMeasures)
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of measure state for $hostname", size = foundHostnameMeasures.size, data = foundHostnameMeasures))
     }
 
     /**
@@ -196,19 +198,19 @@ class Controller(rpc: NodeRPCConnection) {
     @GetMapping(value = [ "getHistoryMeasureStateByMacAddress/{macAddress}" ], produces = [ APPLICATION_JSON_VALUE ])
     fun getHistoryMeasureStateByMacAddress(
             @PathVariable("macAddress")
-            macAddress : String ) : ResponseEntity<List<StateAndRef<MeasureState>>> {
+            macAddress : String ) : ResponseEntity<ResponseCounterPojo> {
 
         // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for macAddress
         var macAddressCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {MeasureSchemaV1.PersistentMeasure::macAddress.equal(macAddress)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(MeasureState::class.java))
 
-        val foundHostnameMeasures = proxy.vaultQueryBy<MeasureState>(
+        val foundMacaddressMeasures = proxy.vaultQueryBy<MeasureState>(
                 macAddressCriteria,
                 PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
         ).states
                 //.filter { it.state.data.macAddress == macAddress }
 
-        return ResponseEntity.ok(foundHostnameMeasures)
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of measure state for $macAddress", size = foundMacaddressMeasures.size, data = foundMacaddressMeasures))
     }
 
     /***
@@ -271,8 +273,10 @@ class Controller(rpc: NodeRPCConnection) {
      * Displays all CommandStates that exist in the node's vault.
      */
     @GetMapping(value = [ "getLastCommands" ], produces = [ APPLICATION_JSON_VALUE ])
-    fun getLastCommand() : ResponseEntity<List<StateAndRef<CommandState>>> {
-        return ResponseEntity.ok(proxy.vaultQueryBy<CommandState>(paging = PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000)).states)
+    fun getLastCommand() : ResponseEntity<ResponseCounterPojo> {
+        var foundCommandStates = proxy.vaultQueryBy<CommandState>(
+                paging = PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000)).states
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of riu with command state", size = foundCommandStates.size, data = foundCommandStates))
     }
 
     /**
@@ -373,7 +377,7 @@ class Controller(rpc: NodeRPCConnection) {
     @GetMapping(value = [ "getHistoryCommandStateByHostname/{hostname}" ], produces = [ APPLICATION_JSON_VALUE ])
     fun getHistoryCommandStateByHostname(
             @PathVariable("hostname")
-            hostname : String ) : ResponseEntity<List<StateAndRef<CommandState>>> {
+            hostname : String ) : ResponseEntity<ResponseCounterPojo> {
 
         // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for hostname
         var hostnameCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {CommandSchemaV1.PersistentCommand::hostname.equal(hostname)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(CommandState::class.java))
@@ -385,7 +389,7 @@ class Controller(rpc: NodeRPCConnection) {
         ).states
                 //.filter { it.state.data.hostname == hostname }
 
-        return ResponseEntity.ok(foundHostnameCommands)
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of command state for $hostname", size = foundHostnameCommands.size, data = foundHostnameCommands))
     }
 
     /**
@@ -394,19 +398,19 @@ class Controller(rpc: NodeRPCConnection) {
     @GetMapping(value = [ "getHistoryCommandStateByMacAddress/{macAddress}" ], produces = [ APPLICATION_JSON_VALUE ])
     fun getHistoryCommandStateByMacAddress(
             @PathVariable("macAddress")
-            macAddress : String ) : ResponseEntity<List<StateAndRef<CommandState>>> {
+            macAddress : String ) : ResponseEntity<ResponseCounterPojo> {
 
         // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for macAddress
         var macAddressCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {CommandSchemaV1.PersistentCommand::macAddress.equal(macAddress)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(CommandState::class.java))
 
-        val foundHostnameCommands = proxy.vaultQueryBy<CommandState>(
+        val foundMacaddressCommands = proxy.vaultQueryBy<CommandState>(
                 macAddressCriteria,
                 PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
         ).states
                 //.filter { it.state.data.macAddress == macAddress }
 
-        return ResponseEntity.ok(foundHostnameCommands)
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of command state for $macAddress", size = foundMacaddressCommands.size, data = foundMacaddressCommands))
     }
 
     /***
@@ -469,8 +473,9 @@ class Controller(rpc: NodeRPCConnection) {
      * Displays all ForcedMeasureStates that exist in the node's vault.
      */
     @GetMapping(value = [ "getLastForcedMeasures" ], produces = [ APPLICATION_JSON_VALUE ])
-    fun getLastForcedMeasures() : ResponseEntity<List<StateAndRef<ForcedMeasureState>>> {
-        return ResponseEntity.ok(proxy.vaultQueryBy<ForcedMeasureState>(paging = PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000)).states)
+    fun getLastForcedMeasures() : ResponseEntity<ResponseCounterPojo> {
+        var foundForcedMeasures = proxy.vaultQueryBy<ForcedMeasureState>(paging = PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000)).states
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of riu with forced measure state", size = foundForcedMeasures.size, data = foundForcedMeasures))
     }
 
     /**
@@ -572,7 +577,7 @@ class Controller(rpc: NodeRPCConnection) {
     @GetMapping(value = [ "getHistoryForcedMeasureStateByHostname/{hostname}" ], produces = [ APPLICATION_JSON_VALUE ])
     fun getHistoryForcedMeasureStateByHostname(
             @PathVariable("hostname")
-            hostname : String ) : ResponseEntity<List<StateAndRef<ForcedMeasureState>>> {
+            hostname : String ) : ResponseEntity<ResponseCounterPojo> {
 
         // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for hostname
         var hostnameCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {ForcedMeasureSchemaV1.PersistentForcedMeasure::hostname.equal(hostname)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(ForcedMeasureState::class.java))
@@ -584,7 +589,7 @@ class Controller(rpc: NodeRPCConnection) {
         ).states
                 //.filter { it.state.data.hostname == hostname }
 
-        return ResponseEntity.ok(foundHostnameForcedMeasures)
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of forced measure state for $hostname", size = foundHostnameForcedMeasures.size, data = foundHostnameForcedMeasures))
     }
 
     /**
@@ -593,19 +598,19 @@ class Controller(rpc: NodeRPCConnection) {
     @GetMapping(value = [ "getHistoryForcedMeasureStateByMacAddress/{macAddress}" ], produces = [ APPLICATION_JSON_VALUE ])
     fun getHistoryForcedMeasureStateByMacAddress(
             @PathVariable("macAddress")
-            macAddress : String ) : ResponseEntity<List<StateAndRef<ForcedMeasureState>>> {
+            macAddress : String ) : ResponseEntity<ResponseCounterPojo> {
 
         // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for macAddress
         var macAddressCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {ForcedMeasureSchemaV1.PersistentForcedMeasure::macAddress.equal(macAddress)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(ForcedMeasureState::class.java))
 
-        val foundHostnameForcedMeasures = proxy.vaultQueryBy<ForcedMeasureState>(
+        val foundMacaddressForcedMeasures = proxy.vaultQueryBy<ForcedMeasureState>(
                 macAddressCriteria,
                 PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
         ).states
                 //.filter { it.state.data.macAddress == macAddress }
 
-        return ResponseEntity.ok(foundHostnameForcedMeasures)
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of forced measure state for $macAddress", size = foundMacaddressForcedMeasures.size, data = foundMacaddressForcedMeasures))
     }
 
     /***
@@ -668,8 +673,9 @@ class Controller(rpc: NodeRPCConnection) {
      * Displays all FlowComputerStates that exist in the node's vault.
      */
     @GetMapping(value = [ "getLastFlowComputer" ], produces = [ APPLICATION_JSON_VALUE ])
-    fun getLastFlowComputer() : ResponseEntity<List<StateAndRef<FlowComputerState>>> {
-        return ResponseEntity.ok(proxy.vaultQueryBy<FlowComputerState>(paging = PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000)).states)
+    fun getLastFlowComputer() : ResponseEntity<ResponseCounterPojo> {
+        var foundFlowComputerState = proxy.vaultQueryBy<FlowComputerState>(paging = PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000)).states
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of riu with flow computer state", size = foundFlowComputerState.size, data = foundFlowComputerState))
     }
 
     /**
@@ -760,7 +766,7 @@ class Controller(rpc: NodeRPCConnection) {
     @GetMapping(value = [ "getHistoryFlowComputerStateByHostname/{hostname}" ], produces = [ APPLICATION_JSON_VALUE ])
     fun getHistoryFlowComputerStateByHostname(
             @PathVariable("hostname")
-            hostname : String ) : ResponseEntity<List<StateAndRef<FlowComputerState>>> {
+            hostname : String ) : ResponseEntity<ResponseCounterPojo> {
 
         // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for hostname
         var hostnameCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {FlowComputerSchemaV1.PersistentFlowComputer::hostname.equal(hostname)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(FlowComputerState::class.java))
@@ -772,7 +778,7 @@ class Controller(rpc: NodeRPCConnection) {
         ).states
                 //.filter { it.state.data.hostname == hostname }
 
-        return ResponseEntity.ok(foundHostnameFlowComputer)
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of flow computer state for $hostname", size = foundHostnameFlowComputer.size, data = foundHostnameFlowComputer))
     }
 
     /**
@@ -781,19 +787,19 @@ class Controller(rpc: NodeRPCConnection) {
     @GetMapping(value = [ "getHistoryFlowComputerStateByMacAddress/{macAddress}" ], produces = [ APPLICATION_JSON_VALUE ])
     fun getHistoryFlowComputerStateByMacAddress(
             @PathVariable("macAddress")
-            macAddress : String ) : ResponseEntity<List<StateAndRef<FlowComputerState>>> {
+            macAddress : String ) : ResponseEntity<ResponseCounterPojo> {
 
         // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for macAddress
         var macAddressCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {FlowComputerSchemaV1.PersistentFlowComputer::macAddress.equal(macAddress)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(FlowComputerState::class.java))
 
-        val foundHostnameFlowComputer = proxy.vaultQueryBy<FlowComputerState>(
+        val foundMacaddressFlowComputer = proxy.vaultQueryBy<FlowComputerState>(
                 macAddressCriteria,
                 PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
                 Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
         ).states
                 //.filter { it.state.data.macAddress == macAddress }
 
-        return ResponseEntity.ok(foundHostnameFlowComputer)
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of flow computer state for $macAddress", size = foundMacaddressFlowComputer.size, data = foundMacaddressFlowComputer))
     }
 
     /***
