@@ -80,7 +80,7 @@ class Controller(rpc: NodeRPCConnection) {
     fun getLastMeasures() : ResponseEntity<ResponseCounterPojo> {
         var foundLastMeasureStates = proxy.vaultQueryBy<MeasureState>(
                 paging = PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000)).states
-        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of registered rius", size = foundLastMeasureStates.size))
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of registered rius", size = foundLastMeasureStates.size, data = foundLastMeasureStates))
     }
 
     /**
