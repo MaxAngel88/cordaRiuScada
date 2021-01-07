@@ -193,6 +193,41 @@ class Controller(rpc: NodeRPCConnection) {
     }
 
     /**
+     * Displays History MeasureStates that exist in the node's vault for selected hostname after provided Date.
+     */
+    @PostMapping(value = [ "getDateHistoryMeasureStateByHostname" ], consumes = [APPLICATION_JSON_VALUE], produces = [ APPLICATION_JSON_VALUE ], headers = [ "Content-Type=application/json" ])
+    fun getDateHistoryMeasureStateByHostname(
+            @RequestBody
+            dateRequestPojo: DateRequestPojo ) : ResponseEntity<ResponseCounterPojo> {
+
+        val riuTarget = dateRequestPojo.riu_target
+        val startTime = dateRequestPojo.startTime
+        val endTime = dateRequestPojo.endTime
+
+        if(riuTarget.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponseCounterPojo(outcome = "ERROR", message = "riu_target cannot be empty", size = 0, data = null))
+        }
+
+        // setting the criteria to find STATES between chosen start time and now
+        var timeCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {MeasureSchemaV1.PersistentMeasure::time.between(from = startTime, to = endTime)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(MeasureState::class.java))
+
+        // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for hostname
+        var hostnameCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {MeasureSchemaV1.PersistentMeasure::hostname.equal(riuTarget)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(MeasureState::class.java))
+
+        // compose all criteria
+        val combinedCriteria = timeCriteria.and(hostnameCriteria)
+
+        val foundMacaddressTime2Measures = proxy.vaultQueryBy<MeasureState>(
+                combinedCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states
+        //.filter { it.state.data.hostname == hostname }
+
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of measure state for $riuTarget starting from $startTime", size = foundMacaddressTime2Measures.size, data = foundMacaddressTime2Measures))
+    }
+
+    /**
      * Displays History MeasureStates that exist in the node's vault for selected macAddress.
      */
     @GetMapping(value = [ "getHistoryMeasureStateByMacAddress/{macAddress}" ], produces = [ APPLICATION_JSON_VALUE ])
@@ -211,6 +246,41 @@ class Controller(rpc: NodeRPCConnection) {
                 //.filter { it.state.data.macAddress == macAddress }
 
         return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of measure state for $macAddress", size = foundMacaddressMeasures.size, data = foundMacaddressMeasures))
+    }
+
+    /**
+     * Displays History MeasureStates that exist in the node's vault for selected macAddress after provided Date.
+     */
+    @PostMapping(value = [ "getDateHistoryMeasureStateByMacAddress" ], consumes = [APPLICATION_JSON_VALUE], produces = [ APPLICATION_JSON_VALUE ], headers = [ "Content-Type=application/json" ])
+    fun getDateHistoryMeasureStateByMacAddress(
+            @RequestBody
+            dateRequestPojo: DateRequestPojo ) : ResponseEntity<ResponseCounterPojo> {
+
+        val riuTarget = dateRequestPojo.riu_target
+        val startTime = dateRequestPojo.startTime
+        val endTime = dateRequestPojo.endTime
+
+        if(riuTarget.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponseCounterPojo(outcome = "ERROR", message = "riuTarget cannot be empty", size = 0, data = null))
+        }
+
+        // setting the criteria to find STATES between chosen start time and now
+        var timeCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {MeasureSchemaV1.PersistentMeasure::time.between(from = startTime, to = endTime)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(MeasureState::class.java))
+
+        // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for macAddress
+        var macAddressCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {MeasureSchemaV1.PersistentMeasure::macAddress.equal(riuTarget)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(MeasureState::class.java))
+
+        // compose all criteria
+        val combinedCriteria = timeCriteria.and(macAddressCriteria)
+
+        val foundMacaddressTime2Measures = proxy.vaultQueryBy<MeasureState>(
+                combinedCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states
+        //.filter { it.state.data.macAddress == macAddress }
+
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of measure state for $riuTarget starting from $startTime", size = foundMacaddressTime2Measures.size, data = foundMacaddressTime2Measures))
     }
 
     /***
@@ -393,6 +463,41 @@ class Controller(rpc: NodeRPCConnection) {
     }
 
     /**
+     * Displays History CommandStates that exist in the node's vault for selected hostname after provided Date.
+     */
+    @PostMapping(value = [ "getDateHistoryCommandStateByHostname" ], consumes = [APPLICATION_JSON_VALUE], produces = [ APPLICATION_JSON_VALUE ], headers = [ "Content-Type=application/json" ])
+    fun getDateHistoryCommandStateByHostname(
+            @RequestBody
+            dateRequestPojo: DateRequestPojo ) : ResponseEntity<ResponseCounterPojo> {
+
+        val riuTarget = dateRequestPojo.riu_target
+        val startTime = dateRequestPojo.startTime
+        val endTime = dateRequestPojo.endTime
+
+        if(riuTarget.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponseCounterPojo(outcome = "ERROR", message = "riu_target cannot be empty", size = 0, data = null))
+        }
+
+        // setting the criteria to find STATES between chosen start time and now
+        var timeCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {CommandSchemaV1.PersistentCommand::time.between(from = startTime, to = endTime)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(CommandState::class.java))
+
+        // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for hostname
+        var hostnameCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {CommandSchemaV1.PersistentCommand::hostname.equal(riuTarget)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(CommandState::class.java))
+
+        // compose all criteria
+        val combinedCriteria = timeCriteria.and(hostnameCriteria)
+
+        val foundHostnameTime2Commands = proxy.vaultQueryBy<CommandState>(
+                combinedCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states
+        //.filter { it.state.data.hostname == hostname }
+
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of command state for $riuTarget starting from $startTime", size = foundHostnameTime2Commands.size, data = foundHostnameTime2Commands))
+    }
+
+    /**
      * Displays History CommandStates that exist in the node's vault for selected macAddress.
      */
     @GetMapping(value = [ "getHistoryCommandStateByMacAddress/{macAddress}" ], produces = [ APPLICATION_JSON_VALUE ])
@@ -411,6 +516,41 @@ class Controller(rpc: NodeRPCConnection) {
                 //.filter { it.state.data.macAddress == macAddress }
 
         return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of command state for $macAddress", size = foundMacaddressCommands.size, data = foundMacaddressCommands))
+    }
+
+    /**
+     * Displays History CommandStates that exist in the node's vault for selected macAddress after provided Date.
+     */
+    @PostMapping(value = [ "getDateHistoryCommandStateByMacAddress" ], consumes = [APPLICATION_JSON_VALUE], produces = [ APPLICATION_JSON_VALUE ], headers = [ "Content-Type=application/json" ])
+    fun getDateHistoryCommandStateByMacAddress(
+            @RequestBody
+            dateRequestPojo: DateRequestPojo ) : ResponseEntity<ResponseCounterPojo> {
+
+        val riuTarget = dateRequestPojo.riu_target
+        val startTime = dateRequestPojo.startTime
+        val endTime = dateRequestPojo.endTime
+
+        if(riuTarget.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponseCounterPojo(outcome = "ERROR", message = "riu_target cannot be empty", size = 0, data = null))
+        }
+
+        // setting the criteria to find STATES between chosen start time and now
+        var timeCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {CommandSchemaV1.PersistentCommand::time.between(from = startTime, to = endTime)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(CommandState::class.java))
+
+        // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for hostname
+        var macAddressCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {CommandSchemaV1.PersistentCommand::macAddress.equal(riuTarget)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(CommandState::class.java))
+
+        // compose all criteria
+        val combinedCriteria = timeCriteria.and(macAddressCriteria)
+
+        val foundHostnameTime2Commands = proxy.vaultQueryBy<CommandState>(
+                combinedCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states
+        //.filter { it.state.data.hostname == hostname }
+
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of command state for $riuTarget starting from $startTime", size = foundHostnameTime2Commands.size, data = foundHostnameTime2Commands))
     }
 
     /***
@@ -593,6 +733,41 @@ class Controller(rpc: NodeRPCConnection) {
     }
 
     /**
+     * Displays History ForcedMeasureStates that exist in the node's vault for selected hostname after provided Date.
+     */
+    @PostMapping(value = [ "getDateHistoryForcedMeasureStateByHostname" ], consumes = [APPLICATION_JSON_VALUE], produces = [ APPLICATION_JSON_VALUE ], headers = [ "Content-Type=application/json" ])
+    fun getDateHistoryForcedMeasureStateByHostname(
+            @RequestBody
+            dateRequestPojo: DateRequestPojo ) : ResponseEntity<ResponseCounterPojo> {
+
+        val riuTarget = dateRequestPojo.riu_target
+        val startTime = dateRequestPojo.startTime
+        val endTime = dateRequestPojo.endTime
+
+        if(riuTarget.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponseCounterPojo(outcome = "ERROR", message = "riu_target cannot be empty", size = 0, data = null))
+        }
+
+        // setting the criteria to find STATES between chosen start time and now
+        var timeCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {ForcedMeasureSchemaV1.PersistentForcedMeasure::requestTime.between(from = startTime, to = endTime)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(ForcedMeasureState::class.java))
+
+        // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for hostname
+        var hostnameCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {ForcedMeasureSchemaV1.PersistentForcedMeasure::hostname.equal(riuTarget)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(ForcedMeasureState::class.java))
+
+        // compose all criteria
+        val combinedCriteria = timeCriteria.and(hostnameCriteria)
+
+        val foundHostnameTime2ForcedMeasures = proxy.vaultQueryBy<ForcedMeasureState>(
+                combinedCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states
+        //.filter { it.state.data.hostname == hostname }
+
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of forced measure state for $riuTarget starting from $startTime", size = foundHostnameTime2ForcedMeasures.size, data = foundHostnameTime2ForcedMeasures))
+    }
+
+    /**
      * Displays History ForcedMeasureStates that exist in the node's vault for selected macAddress.
      */
     @GetMapping(value = [ "getHistoryForcedMeasureStateByMacAddress/{macAddress}" ], produces = [ APPLICATION_JSON_VALUE ])
@@ -611,6 +786,41 @@ class Controller(rpc: NodeRPCConnection) {
                 //.filter { it.state.data.macAddress == macAddress }
 
         return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of forced measure state for $macAddress", size = foundMacaddressForcedMeasures.size, data = foundMacaddressForcedMeasures))
+    }
+
+    /**
+     * Displays History ForcedMeasureStates that exist in the node's vault for selected macAddress after provided Date.
+     */
+    @PostMapping(value = [ "getDateHistoryForcedMeasureStateByMacAddress" ], consumes = [APPLICATION_JSON_VALUE], produces = [ APPLICATION_JSON_VALUE ], headers = [ "Content-Type=application/json" ])
+    fun getDateHistoryForcedMeasureStateByMacAddress(
+            @RequestBody
+            dateRequestPojo: DateRequestPojo ) : ResponseEntity<ResponseCounterPojo> {
+
+        val riuTarget = dateRequestPojo.riu_target
+        val startTime = dateRequestPojo.startTime
+        val endTime = dateRequestPojo.endTime
+
+        if(riuTarget.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponseCounterPojo(outcome = "ERROR", message = "riu_target cannot be empty", size = 0, data = null))
+        }
+
+        // setting the criteria to find STATES between chosen start time and now
+        var timeCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {ForcedMeasureSchemaV1.PersistentForcedMeasure::requestTime.between(from = startTime, to = endTime)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(ForcedMeasureState::class.java))
+
+        // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for macAddress
+        var macAddressCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {ForcedMeasureSchemaV1.PersistentForcedMeasure::macAddress.equal(riuTarget)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(ForcedMeasureState::class.java))
+
+        // compose all criteria
+        val combinedCriteria = timeCriteria.and(macAddressCriteria)
+
+        val foundMacaddressTime2ForcedMeasures = proxy.vaultQueryBy<ForcedMeasureState>(
+                combinedCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states
+        //.filter { it.state.data.macAddress == macAddress }
+
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of forced measure state for $riuTarget starting from $startTime", size = foundMacaddressTime2ForcedMeasures.size, data = foundMacaddressTime2ForcedMeasures))
     }
 
     /***
@@ -782,6 +992,41 @@ class Controller(rpc: NodeRPCConnection) {
     }
 
     /**
+     * Displays History FlowComputerStates that exist in the node's vault for selected hostname after provided Date.
+     */
+    @PostMapping(value = [ "getDateHistoryFlowComputerStateByHostname" ], consumes = [APPLICATION_JSON_VALUE], produces = [ APPLICATION_JSON_VALUE ], headers = [ "Content-Type=application/json" ])
+    fun getDateHistoryFlowComputerStateByHostname(
+            @RequestBody
+            dateRequestPojo: DateRequestPojo ) : ResponseEntity<ResponseCounterPojo> {
+
+        val riuTarget = dateRequestPojo.riu_target
+        val startTime = dateRequestPojo.startTime
+        val endTime = dateRequestPojo.endTime
+
+        if(riuTarget.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponseCounterPojo(outcome = "ERROR", message = "riu_target cannot be empty", size = 0, data = null))
+        }
+
+        // setting the criteria to find STATES between chosen start time and now
+        var timeCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {FlowComputerSchemaV1.PersistentFlowComputer::time.between(from = startTime, to = endTime)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(FlowComputerState::class.java))
+
+        // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for hostname
+        var hostnameCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {FlowComputerSchemaV1.PersistentFlowComputer::hostname.equal(riuTarget)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(FlowComputerState::class.java))
+
+        // compose all criteria
+        val combinedCriteria = timeCriteria.and(hostnameCriteria)
+
+        val foundHostnameTime2FlowComputer = proxy.vaultQueryBy<FlowComputerState>(
+                combinedCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states
+        //.filter { it.state.data.hostname == hostname }
+
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of flow computer state for $riuTarget starting from $startTime", size = foundHostnameTime2FlowComputer.size, data = foundHostnameTime2FlowComputer))
+    }
+
+    /**
      * Displays History FlowComputerStates that exist in the node's vault for selected macAddress.
      */
     @GetMapping(value = [ "getHistoryFlowComputerStateByMacAddress/{macAddress}" ], produces = [ APPLICATION_JSON_VALUE ])
@@ -800,6 +1045,41 @@ class Controller(rpc: NodeRPCConnection) {
                 //.filter { it.state.data.macAddress == macAddress }
 
         return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of flow computer state for $macAddress", size = foundMacaddressFlowComputer.size, data = foundMacaddressFlowComputer))
+    }
+
+    /**
+     * Displays History FlowComputerStates that exist in the node's vault for selected macAddress after provided Date.
+     */
+    @PostMapping(value = [ "getDateHistoryFlowComputerStateByMacAddress" ], consumes = [APPLICATION_JSON_VALUE], produces = [ APPLICATION_JSON_VALUE ], headers = [ "Content-Type=application/json" ])
+    fun getDateHistoryFlowComputerStateByMacAddress(
+            @RequestBody
+            dateRequestPojo: DateRequestPojo ) : ResponseEntity<ResponseCounterPojo> {
+
+        val riuTarget = dateRequestPojo.riu_target
+        val startTime = dateRequestPojo.startTime
+        val endTime = dateRequestPojo.endTime
+
+        if(riuTarget.isEmpty()) {
+            return ResponseEntity.badRequest().body(ResponseCounterPojo(outcome = "ERROR", message = "riu_target cannot be empty", size = 0, data = null))
+        }
+
+        // setting the criteria to find STATES between chosen start time and now
+        var timeCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {FlowComputerSchemaV1.PersistentFlowComputer::time.between(from = startTime, to = endTime)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(FlowComputerState::class.java))
+
+        // setting the criteria for retrive CONSUMED - UNCONSUMED state AND filter it for macAddress
+        var macAddressCriteria : QueryCriteria = QueryCriteria.VaultCustomQueryCriteria(expression = builder {FlowComputerSchemaV1.PersistentFlowComputer::macAddress.equal(riuTarget)}, status = Vault.StateStatus.ALL, contractStateTypes = setOf(FlowComputerState::class.java))
+
+        // compose all criteria
+        val combinedCriteria = timeCriteria.and(macAddressCriteria)
+
+        val foundMacaddressTime2FlowComputer = proxy.vaultQueryBy<FlowComputerState>(
+                combinedCriteria,
+                PageSpecification(pageNumber = DEFAULT_PAGE_NUM, pageSize = 1000),
+                Sort(setOf(Sort.SortColumn(SortAttribute.Standard(Sort.VaultStateAttribute.RECORDED_TIME), Sort.Direction.DESC)))
+        ).states
+        //.filter { it.state.data.macAddress == macAddress }
+
+        return ResponseEntity.status(HttpStatus.OK).body(ResponseCounterPojo(outcome = "SUCCESS", message = "Number of flow computer state for $riuTarget starting from $startTime", size = foundMacaddressTime2FlowComputer.size, data = foundMacaddressTime2FlowComputer))
     }
 
     /***
