@@ -293,16 +293,18 @@ class Controller(rpc: NodeRPCConnection) {
             @RequestBody
             updateMeasurePojo: UpdateMeasurePojo): ResponseEntity<ResponsePojo> {
 
-        val measureLinearId = updateMeasurePojo.measureLinearId
+        // val measureLinearId = updateMeasurePojo.measureLinearId
         val hostname = updateMeasurePojo.hostname
         val macAddress = updateMeasurePojo.macAddress
         val time = updateMeasurePojo.time
         val xmlData = updateMeasurePojo.xmlData
         val uuid = updateMeasurePojo.uuid
 
+        /*
         if(measureLinearId.isEmpty()) {
             return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "measureLinearId cannot be empty", data = null))
         }
+        */
 
         if(hostname.isEmpty()) {
             return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "hostname cannot be empty", data = null))
@@ -325,8 +327,8 @@ class Controller(rpc: NodeRPCConnection) {
         }
 
         return try {
-            val updateMeasure = proxy.startTrackedFlow(::Updater, measureLinearId, hostname, macAddress, Instant.parse(time), xmlData, uuid).returnValue.getOrThrow()
-            ResponseEntity.status(HttpStatus.CREATED).body(ResponsePojo(outcome = "SUCCESS", message = "Measure with id: $measureLinearId update correctly. " + "New MeasureState with id: ${updateMeasure.linearId.id}  created.. ledger updated.\n", data = updateMeasure))
+            val updateMeasure = proxy.startTrackedFlow(::Updater, hostname, macAddress, Instant.parse(time), xmlData, uuid).returnValue.getOrThrow()
+            ResponseEntity.status(HttpStatus.CREATED).body(ResponsePojo(outcome = "SUCCESS", message = "Measure update correctly. New MeasureState with id: ${updateMeasure.linearId.id}  created.. ledger updated.\n", data = updateMeasure))
         } catch (ex: Throwable) {
             logger.error(ex.message, ex)
             ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = ex.message!!, data = null))
@@ -833,16 +835,18 @@ class Controller(rpc: NodeRPCConnection) {
             @RequestBody
             updateForcedMeasurePojo: UpdateForcedMeasurePojo): ResponseEntity<ResponsePojo> {
 
-        val forcedMeasureLinearId = updateForcedMeasurePojo.forcedMeasureLinearId
+        // val forcedMeasureLinearId = updateForcedMeasurePojo.forcedMeasureLinearId
         val hostname = updateForcedMeasurePojo.hostname
         val macAddress = updateForcedMeasurePojo.macAddress
         val xmlData = updateForcedMeasurePojo.xmlData
         val startTime = updateForcedMeasurePojo.startTime
         val endTime = updateForcedMeasurePojo.endTime
 
+        /*
         if(forcedMeasureLinearId.isEmpty()) {
             return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "forcedMeasureLinearId cannot be empty", data = null))
         }
+        */
 
         if(hostname.isEmpty()) {
             return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "hostname cannot be empty", data = null))
@@ -865,8 +869,8 @@ class Controller(rpc: NodeRPCConnection) {
         }
 
         return try {
-            val updateForcedMeasure = proxy.startTrackedFlow(::ForcedUpdater, forcedMeasureLinearId, hostname, macAddress, xmlData, Instant.parse(startTime), Instant.parse(endTime)).returnValue.getOrThrow()
-            ResponseEntity.status(HttpStatus.CREATED).body(ResponsePojo(outcome = "SUCCESS", message = "Measure with id: $forcedMeasureLinearId update correctly. " + "New ForcedMeasureState with id: ${updateForcedMeasure.linearId.id}  created.. ledger updated.\n", data = updateForcedMeasure))
+            val updateForcedMeasure = proxy.startTrackedFlow(::ForcedUpdater, hostname, macAddress, xmlData, Instant.parse(startTime), Instant.parse(endTime)).returnValue.getOrThrow()
+            ResponseEntity.status(HttpStatus.CREATED).body(ResponsePojo(outcome = "SUCCESS", message = "Forced Measure update correctly. New ForcedMeasureState with id: ${updateForcedMeasure.linearId.id}  created.. ledger updated.\n", data = updateForcedMeasure))
         } catch (ex: Throwable) {
             logger.error(ex.message, ex)
             ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = ex.message!!, data = null))
@@ -1092,14 +1096,16 @@ class Controller(rpc: NodeRPCConnection) {
             @RequestBody
             updateFlowComputerPojo: UpdateFlowComputerPojo): ResponseEntity<ResponsePojo> {
 
-        val flowComputerLinearId = updateFlowComputerPojo.flowComputerLinearId
+        // val flowComputerLinearId = updateFlowComputerPojo.flowComputerLinearId
         val hostname = updateFlowComputerPojo.hostname
         val macAddress = updateFlowComputerPojo.macAddress
         val binaryData = updateFlowComputerPojo.binaryData
 
+        /*
         if(flowComputerLinearId.isEmpty()) {
             return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "flowComputerLinearId cannot be empty", data = null))
         }
+        */
 
         if(hostname.isEmpty()) {
             return ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = "hostname cannot be empty", data = null))
@@ -1114,8 +1120,8 @@ class Controller(rpc: NodeRPCConnection) {
         }
 
         return try {
-            val updateFlowComputer = proxy.startTrackedFlow(::FlowComputerUpdater, flowComputerLinearId, hostname, macAddress, binaryData).returnValue.getOrThrow()
-            ResponseEntity.status(HttpStatus.CREATED).body(ResponsePojo(outcome = "SUCCESS", message = "FlowComputer with id: $flowComputerLinearId update correctly. " + "New FlowComputerState with id: ${updateFlowComputer.linearId.id}  created.. ledger updated.\n", data = updateFlowComputer))
+            val updateFlowComputer = proxy.startTrackedFlow(::FlowComputerUpdater, hostname, macAddress, binaryData).returnValue.getOrThrow()
+            ResponseEntity.status(HttpStatus.CREATED).body(ResponsePojo(outcome = "SUCCESS", message = "FlowComputer update correctly. New FlowComputerState with id: ${updateFlowComputer.linearId.id}  created.. ledger updated.\n", data = updateFlowComputer))
         } catch (ex: Throwable) {
             logger.error(ex.message, ex)
             ResponseEntity.badRequest().body(ResponsePojo(outcome = "ERROR", message = ex.message!!, data = null))
